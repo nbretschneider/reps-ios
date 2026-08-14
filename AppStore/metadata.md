@@ -168,13 +168,25 @@ requires the pair.
 
 ## In-app purchases
 
-| Product | ID | Type | Price tier | Trial |
+| Product | ID | Type | Price | Trial |
 |---|---|---|---|---|
-| Reps Pro (Annual) | `com.gradedays.reps.pro.annual` | Auto-renewable | 29.99/yr | 3 days free |
-| Reps Pro (Monthly) | `com.gradedays.reps.pro.monthly` | Auto-renewable | 4.99/mo | 3 days free |
-| Reps Pro (Lifetime) | `com.gradedays.reps.pro.lifetime` | Non-consumable | 49.99 | n/a |
+| Reps Pro (Annual) | `com.gradedays.reps.pro.annual` | Auto-renewable | $9.99/yr | 7 days free |
+| Reps Pro (Monthly) | `com.gradedays.reps.pro.monthly` | Auto-renewable | $1.99/mo | 7 days free |
+| Reps Pro (Lifetime) | `com.gradedays.reps.pro.lifetime` | Non-consumable | $19.99 | n/a |
 
 Subscription group: `Reps Pro`. Annual is the default selection on the paywall.
+
+Priced deliberately low. Annual is 83 cents a month and a 58% saving over monthly, so it is
+the obvious pick — which is the point, because annual subscribers churn far less. There are
+no server costs behind any of this, so cheap costs nothing to sustain.
+
+**A price can be lowered whenever you like. Raising it on existing subscribers requires
+each of them to actively opt in, and most never do.** So whatever ships is effectively
+permanent for everyone who signs up early. Worth being sure before the first release.
+
+The trial is 7 days rather than 3 because Reps schedules three sessions a week: a 3-day
+trial can contain a single workout, which is not enough to see the plan adapt. Seven days
+is one full training week, the smallest unit that demonstrates what the app actually does.
 
 **Display names must match the paywall**, which reads them off the product rather than
 hardcoding, so whatever is typed into App Store Connect is what the user sees.
@@ -184,20 +196,40 @@ after onboarding. It is always dismissible, and the app is fully functional with
 
 ### Setting these up in App Store Connect
 
-The product IDs above must match `PurchaseStore.productIDs` exactly, character for
-character. A typo does not error; the paywall just shows "Pricing is unavailable", which is
-the single most common way a first StoreKit release goes wrong.
+Written out in full because this is the first Reps release that takes money, and two of
+these steps block people for days without making it obvious that they are the cause.
 
-1. **Agreements, Tax, and Banking** has to show the Paid Apps agreement as *Active* before
-   any product will load, even in sandbox. This is the step that blocks people for days.
-2. Create the subscription group **Reps Pro** first, then the annual and monthly
-   subscriptions inside it. Create the lifetime unlock separately as a **non-consumable**.
-3. Each subscription needs a localized display name and description, a price, and a
-   **review screenshot of the paywall** attached to the product itself. Without that
-   screenshot the product stays in "Missing Metadata" and cannot be submitted.
-4. Add the 3-day free trial as an **Introductory Offer** on both subscriptions.
-5. Products are submitted **with** the first app version that contains them. They do not go
-   live separately.
+**1. Business (formerly "Agreements, Tax, and Banking") must read Active.**
+Accept the **Paid Applications** agreement, add a **bank account**, and complete the **tax
+forms**. Until this is Active, products do not load **even in sandbox** — and the symptom
+is the paywall showing "Pricing is unavailable", which looks exactly like a code bug and is
+not one. Check here first whenever products fail to appear.
+
+**2. Apply to the Apple Small Business Program.**
+Commission drops from 30% to **15%** for developers under $1M a year. It is a short form
+under Business, it has to be applied for, and it is not automatic or retroactive within a
+year. Missing it is the most expensive routine mistake a first release makes. At $9.99 a
+year that is the difference between keeping $6.99 and keeping $8.49 per subscriber.
+
+**3. Create the products.** IDs must match `PurchaseStore.productIDs` **exactly**, character
+for character — a typo does not error anywhere, it just silently produces no products.
+
+- Subscription group **`Reps Pro`** first, then the annual and monthly subscriptions inside
+  it. Being in one group is what lets someone switch between them and what stops them
+  buying both.
+- The lifetime unlock is created separately as a **non-consumable**, not in the group.
+- Add the 7-day free trial as an **Introductory Offer** on each subscription.
+
+**4. Attach a paywall screenshot to each subscription.**
+Not the app's screenshots — a screenshot on the product itself, for the reviewer. Without
+it the product stays in "Missing Metadata" and cannot be submitted at all.
+
+**5. Submit the products with the first app version.**
+They do not go live separately, and a version submitted without them will ship a paywall
+with nothing behind it.
+
+Payouts arrive roughly 30 to 45 days after each month closes, once Apple's minimum
+threshold is met.
 
 Locally none of this is needed: `Reps.storekit` is wired into the scheme's Run action, so
 the paywall works in the simulator against fake products. See CLAUDE.md.

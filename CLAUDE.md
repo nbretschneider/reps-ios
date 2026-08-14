@@ -219,8 +219,14 @@ what the user sees — the local file's names are only for local runs.
 
 Order of operations for a real release: local `.storekit` first, then create the same three
 product IDs in App Store Connect under a subscription group named `Reps Pro`, then test in
-TestFlight with a sandbox account. A subscription cannot be submitted for review without at
-least one screenshot of the paywall attached to it in App Store Connect.
+TestFlight with a sandbox account.
+
+**Prices, the trial length and the full App Store Connect walkthrough live in
+`AppStore/metadata.md`** — including the two steps that block a first paid release without
+saying so: the Paid Applications agreement has to be Active before products load *even in
+sandbox*, and the Small Business Program (30% → 15% commission) has to be applied for.
+A price can always be lowered later; raising one on existing subscribers needs each of them
+to opt in, so the launch price is effectively permanent for early sign-ups.
 
 ## Releasing to TestFlight
 

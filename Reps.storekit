@@ -5,7 +5,7 @@
   ],
   "products" : [
     {
-      "displayPrice" : "49.99",
+      "displayPrice" : "19.99",
       "familyShareable" : false,
       "internalID" : "6A2D18B4",
       "localizations" : [
@@ -90,14 +90,14 @@
           "codeOffers" : [
 
           ],
-          "displayPrice" : "29.99",
+          "displayPrice" : "9.99",
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "4E80C5A1",
           "introductoryOffer" : {
             "internalID" : "B3F52D08",
             "paymentMode" : "free",
-            "subscriptionPeriod" : "P3D"
+            "subscriptionPeriod" : "P7D"
           },
           "localizations" : [
             {
@@ -122,14 +122,14 @@
           "codeOffers" : [
 
           ],
-          "displayPrice" : "4.99",
+          "displayPrice" : "1.99",
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "7D14F6BE",
           "introductoryOffer" : {
             "internalID" : "C0A93E77",
             "paymentMode" : "free",
-            "subscriptionPeriod" : "P3D"
+            "subscriptionPeriod" : "P7D"
           },
           "localizations" : [
             {
