@@ -135,9 +135,14 @@ First release. Put your phone on the floor and find out how many you can do.
 
 ## Support and marketing URLs
 
-- Support URL: `https://gradedays.com/reps/support`
-- Marketing URL: `https://gradedays.com/reps`
-- Privacy policy URL: `https://gradedays.com/reps/privacy` (required, even with no data collection)
+- Support URL: `https://gradedays.com/reps/support.html`
+- Marketing URL: `https://gradedays.com/reps/`
+- Privacy policy URL: `https://gradedays.com/reps/privacy-policy.html` (required, even with
+  no data collection)
+
+The pages live in `AppStore/web/` and follow Grams' flat-file convention. Deploy by copying
+that directory to `gradedays.com/reps/` the same way the Grams pages were deployed. The
+privacy URL must resolve **before** submission; App Store Connect fetches it.
 
 ---
 

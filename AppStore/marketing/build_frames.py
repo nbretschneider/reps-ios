@@ -20,6 +20,7 @@ import colorsys
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
 
 from PIL import Image, ImageDraw
@@ -507,14 +508,16 @@ def rounded_mask(size: tuple[int, int], radius: int) -> Image.Image:
     return mask.resize(size, Image.LANCZOS)
 
 
-def render(html_body: str, caption: str, sub: str) -> Image.Image:
-    """One marketing frame: caption band from HTML, phone screen composited in."""
+def render(screen: Image.Image, caption: str, sub: str) -> Image.Image:
+    """One marketing frame: caption band from HTML, phone screen composited in.
+
+    `screen` is the full-bleed app screen at any resolution with the device's aspect
+    ratio: either a Chromium render of the mockup HTML or a real simulator capture."""
     scale = 3
     frame = shot(
         f'<div class="frame"><div class="capband"><h1>{caption}</h1><p>{sub}</p></div></div>',
         BASE_CSS + FRAME_CSS, CANVAS_W, CANVAS_H,
     )
-    screen = shot(html_body, BASE_CSS, CANVAS_W, CANVAS_H)
 
     box = (DEVICE_W * scale, DEVICE_H * scale)
     device = screen.resize(box, Image.LANCZOS)
@@ -532,11 +535,50 @@ def render(html_body: str, caption: str, sub: str) -> Image.Image:
     return frame
 
 
+def load_captures(directory: pathlib.Path) -> dict[str, Image.Image]:
+    """Real simulator captures, matched to frames by leading number.
+
+    Name the files anything starting with the frame number: `01.png`,
+    `02-train.png`, `03 whatever.PNG`. Take them in the simulator with ⌘S. Aspect must be
+    the device's (any iPhone screenshot is); anything else is refused rather than
+    stretched, because a stretched screenshot is exactly what guideline 2.3.3 is about.
+    """
+    expected = CANVAS_W / CANVAS_H
+    captures: dict[str, Image.Image] = {}
+    for name, _, _, _ in FRAMES:
+        number = name.split("-")[0]
+        matches = sorted(
+            f for f in directory.iterdir()
+            if f.suffix.lower() == ".png" and f.stem.split("-")[0].split(" ")[0] == number
+        )
+        if not matches:
+            raise SystemExit(f"no capture for frame {name}: expected {number}*.png in {directory}")
+        image = Image.open(matches[0]).convert("RGB")
+        aspect = image.width / image.height
+        if abs(aspect - expected) > 0.01:
+            raise SystemExit(
+                f"{matches[0].name} is {image.width}x{image.height} "
+                f"(aspect {aspect:.3f}, expected {expected:.3f}) — not a full-screen portrait capture"
+            )
+        captures[name] = image
+    return captures
+
+
 def main() -> None:
     if not pathlib.Path(CHROME).exists():
         raise SystemExit(f"Chromium not found at {CHROME}")
     if DEVICE_Y + DEVICE_H > CANVAS_H:
         raise SystemExit("the device slot does not fit under the caption band")
+
+    # `--captures <dir>` composites real simulator screenshots into the captioned frames
+    # instead of the HTML mockups. Use it once the app runs: recreations were only ever a
+    # stand-in for a build that could not exist yet.
+    captures: dict[str, Image.Image] | None = None
+    argv = sys.argv[1:]
+    if argv and argv[0] == "--captures":
+        if len(argv) < 2:
+            raise SystemExit("usage: build_frames.py [--captures <directory>]")
+        captures = load_captures(pathlib.Path(argv[1]))
 
     if OUT.exists():
         shutil.rmtree(OUT)
@@ -544,7 +586,8 @@ def main() -> None:
         (OUT / slot).mkdir(parents=True)
 
     for name, build, caption, sub in FRAMES:
-        image = render(build(), caption, sub)
+        screen = captures[name] if captures else shot(build(), BASE_CSS, CANVAS_W, CANVAS_H)
+        image = render(screen, caption, sub)
         for slot, (width, height) in SLOTS.items():
             resized = image.resize((width, height), Image.LANCZOS)
             assert resized.mode == "RGB", "App Store Connect rejects an alpha channel"

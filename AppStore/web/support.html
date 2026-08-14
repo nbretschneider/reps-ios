@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reps Support</title>
+<meta name="description" content="Help with Reps: setup, counting, purchases and data.">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: hsl(330, 16%, 98%); --fg: hsl(330, 16%, 12%); --muted: hsl(330, 6%, 46%);
+    --card: #fff; --border: hsl(330, 10%, 90%); --brand: hsl(335, 78%, 48%);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: hsl(330, 12%, 7%); --fg: hsl(330, 10%, 96%); --muted: hsl(330, 6%, 64%);
+            --card: hsl(330, 10%, 11%); --border: hsl(330, 8%, 17%); --brand: hsl(335, 82%, 64%); }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 42rem; margin: 0 auto; padding: 3.5rem 1.25rem 5rem; }
+  h1 { font-size: 1.9rem; margin: 0 0 2rem; letter-spacing: -.02em; }
+  .qa { background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+        padding: 1.25rem; margin-bottom: 1rem; }
+  .qa h2 { font-size: 1.05rem; margin: 0 0 .4rem; }
+  .qa p { color: var(--muted); margin: .35rem 0 0; }
+  a { color: var(--brand); }
+  .back { display: inline-block; margin-bottom: 2rem; color: var(--brand); text-decoration: none; }
+  .contact { margin-top: 2.5rem; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <a class="back" href="./index.html">&larr; Reps</a>
+
+  <h1>Support</h1>
+
+  <div class="qa">
+    <h2>The screen goes black during my set. Is it broken?</h2>
+    <p>No, that is the sensor working. iOS turns the display off while the proximity
+       sensor is covered, and at the bottom of a rep your chest is on top of it. Reps
+       speaks the count out loud so you never need to look. The screen comes back the
+       moment you push up.</p>
+  </div>
+
+  <div class="qa">
+    <h2>My reps are not counting</h2>
+    <p>Check three things. The phone is flat on the floor with the screen facing up. Your
+       chest comes down over the top half of the phone, where the earpiece is. Nothing
+       covers the sensor, so a very thick case or a screen protector that overlaps the
+       earpiece can block it. If it still will not count, choose Tap on the setup screen
+       and tap the screen once per rep.</p>
+  </div>
+
+  <div class="qa">
+    <h2>Where did the counting voice go?</h2>
+    <p>Check the mute button on the session screen, and Settings, then Count out loud.
+       The count plays through the speaker even when the ring switch is silenced, but it
+       ducks under whatever music you have playing.</p>
+  </div>
+
+  <div class="qa">
+    <h2>I want more than one set</h2>
+    <p>One working set is the default because it takes about two minutes. To split your
+       session into sets, tap Multiple sets on the Plan tab or on the screen right before
+       you start. Two to five sets, with rest between them.</p>
+  </div>
+
+  <div class="qa">
+    <h2>Restoring Reps Pro</h2>
+    <p>Open the paywall from Profile, then tap Restore in the top corner. Purchases are
+       tied to your Apple Account, so a new phone picks them up after a restore. Manage
+       or cancel the subscription in your App Store account settings.</p>
+  </div>
+
+  <div class="qa">
+    <h2>Getting my data out</h2>
+    <p>Settings, then Export as CSV. Every set you have ever done, in a spreadsheet.
+       There is no account and no server, so this export and your iPhone backup are the
+       only copies that exist.</p>
+  </div>
+
+  <div class="qa">
+    <h2>Starting over</h2>
+    <p>Settings, then Erase all data and start over. This cannot be undone, which is why
+       it asks twice.</p>
+  </div>
+
+  <p class="contact">Still stuck? Email
+     <a href="mailto:ntbretschneider@gmail.com">ntbretschneider@gmail.com</a>
+     and include your iPhone model.</p>
+
+</div>
+</body>
+</html>
