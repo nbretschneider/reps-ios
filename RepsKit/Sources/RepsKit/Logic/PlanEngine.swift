@@ -267,6 +267,29 @@ public enum PlanEngine {
         ).first
     }
 
+    /// Every day in the range the plan never asked anyone to train on.
+    ///
+    /// The streak rule is that **a rest day the plan prescribed does not break a streak**.
+    /// Counting only the days a user explicitly marked would break a perfectly compliant
+    /// three-days-a-week streak every single Tuesday, which is the opposite of the rule.
+    ///
+    /// A `.dailyGoal` plan asks for every day, so it prescribes no rest.
+    public static func prescribedRestDays(
+        for state: PlanState,
+        from start: String,
+        through end: String,
+        calendar: Calendar = .current
+    ) -> Set<String> {
+        let template = PlanCatalog.templateOrDefault(state.planID)
+        guard template.kind != .dailyGoal, !state.trainingWeekdays.isEmpty else { return [] }
+        return Set(
+            DayKey.range(from: start, through: end, calendar: calendar).filter { key in
+                guard let weekday = DayKey.weekday(key, calendar: calendar) else { return false }
+                return !state.trainingWeekdays.contains(weekday)
+            }
+        )
+    }
+
     /// Is `date` a training day for this plan? A `.dailyGoal` plan trains every day.
     public static func isTrainingDay(
         _ state: PlanState,

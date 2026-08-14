@@ -159,6 +159,22 @@ final class RepsStore {
         refreshDerived()
     }
 
+    #if DEBUG
+    /// Replace everything with a generated history, for App Store screenshots.
+    ///
+    /// Writes the whole state rather than folding mutations, because this is not a user
+    /// action being recorded — it is the file being swapped wholesale. Stripped from
+    /// Release, so it cannot reach anyone who installs the app.
+    func installDemoData() {
+        guard let repository else { return }
+        let demo = DemoData.state(calendar: calendar)
+        guard (try? repository.saveState(demo)) != nil else { return }
+        state = demo
+        status = .ready
+        refreshDerived()
+    }
+    #endif
+
     // MARK: - Derived reads
 
     var today: String { DayKey.today(calendar: calendar) }
@@ -170,7 +186,21 @@ final class RepsStore {
     }
 
     var streak: Int {
-        Stats.streak(trainedDays: trainedDays, restDays: state.restDays, today: today, calendar: calendar)
+        Stats.streak(trainedDays: trainedDays, restDays: streakRestDays, today: today, calendar: calendar)
+    }
+
+    /// Days the user marked as rest, **plus every day the plan never asked for**.
+    ///
+    /// Without the second half, a three-days-a-week plan breaks its own streak every
+    /// Tuesday and a perfectly compliant user never sees a number above one. Bounded to a
+    /// year of lookback because that is far past any streak worth rendering.
+    private var streakRestDays: Set<String> {
+        guard let plan = state.plan,
+              let start = DayKey.adding(-400, to: today, calendar: calendar)
+        else { return state.restDays }
+        return state.restDays.union(
+            PlanEngine.prescribedRestDays(for: plan, from: start, through: today, calendar: calendar)
+        )
     }
 
     /// Today's target: the prescribed session if there is one, otherwise the daily goal.
@@ -219,7 +249,9 @@ final class RepsStore {
     }
 
     var records: Records {
-        Stats.records(state.workouts, restDays: state.restDays, calendar: calendar)
+        // Same rest-day rule as the live streak, or the longest-streak record would be
+        // computed against a stricter definition than the number on the Train tab.
+        Stats.records(state.workouts, restDays: streakRestDays, calendar: calendar)
     }
 
     func reps(on dayKey: String) -> Int { state.reps(on: dayKey) }

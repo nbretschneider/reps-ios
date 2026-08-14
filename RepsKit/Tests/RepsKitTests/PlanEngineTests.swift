@@ -318,6 +318,54 @@ struct SchedulingTests {
         }
     }
 
+    @Test("Days the plan never asks for are prescribed rest days")
+    func prescribedRestDays() {
+        // The bug this exists to prevent: a three-days-a-week plan breaking its own streak
+        // every Tuesday, so a perfectly compliant user never sees a number above one.
+        let state = makeState(weekdays: [2, 4, 6])   // Mon / Wed / Fri
+        let rest = PlanEngine.prescribedRestDays(
+            for: state, from: "2026-08-03", through: "2026-08-09", calendar: calendar
+        )
+        // Mon 3rd, Wed 5th and Fri 7th are training; the other four are rest.
+        #expect(rest == ["2026-08-04", "2026-08-06", "2026-08-08", "2026-08-09"])
+    }
+
+    @Test("A daily-goal plan prescribes no rest, because it asks for every day")
+    func dailyGoalPrescribesNoRest() {
+        let state = makeState(planID: PlanCatalog.dailyGoalID)
+        #expect(PlanEngine.prescribedRestDays(
+            for: state, from: "2026-08-03", through: "2026-08-09", calendar: calendar
+        ).isEmpty)
+    }
+
+    @Test("A plan with no training days prescribes no rest rather than every day")
+    func noWeekdaysPrescribesNoRest() {
+        // Returning "every day is rest" here would make an unscheduled plan report an
+        // infinite streak, which is worse than reporting none.
+        let state = makeState(weekdays: [])
+        #expect(PlanEngine.prescribedRestDays(
+            for: state, from: "2026-08-03", through: "2026-08-09", calendar: calendar
+        ).isEmpty)
+    }
+
+    @Test("A three-days-a-week streak survives the days between sessions")
+    func streakSurvivesNonTrainingDays() {
+        // The integration the fix is actually for: train Mon, Wed, Fri and the streak is
+        // three, not one.
+        let state = makeState(weekdays: [2, 4, 6])
+        let trained: Set<String> = ["2026-08-03", "2026-08-05", "2026-08-07"]
+        let rest = PlanEngine.prescribedRestDays(
+            for: state, from: "2026-07-01", through: "2026-08-07", calendar: calendar
+        )
+        #expect(Stats.streak(trainedDays: trained, restDays: rest,
+                             today: "2026-08-07", calendar: calendar) == 3)
+
+        // And a genuinely missed session still breaks it: skip Wednesday.
+        let missed: Set<String> = ["2026-08-03", "2026-08-07"]
+        #expect(Stats.streak(trainedDays: missed, restDays: rest,
+                             today: "2026-08-07", calendar: calendar) == 1)
+    }
+
     @Test("An explicit rest day is not a training day for any plan")
     func restDayIsNotATrainingDay() {
         let state = makeState(planID: PlanCatalog.dailyGoalID)

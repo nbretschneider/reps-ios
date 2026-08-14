@@ -22,6 +22,9 @@ struct SettingsView: View {
             proSection
             dataSection
             aboutSection
+            #if DEBUG
+            debugSection
+            #endif
         }
         .scrollContentBackground(.hidden)
         .background(Color.rBackground.ignoresSafeArea())
@@ -169,6 +172,26 @@ struct SettingsView: View {
             Text("Everything lives on this iPhone. There is no account, no server and no sync, so an export is the only backup.")
         }
     }
+
+    /// Screenshot tooling. `#if DEBUG` so it is compiled out of the archive entirely —
+    /// there is no runtime flag to get this wrong.
+    #if DEBUG
+    private var debugSection: some View {
+        Section {
+            Button("Fill with demo data") {
+                store.installDemoData()
+                Haptics.celebrate()
+            }
+            Button("Erase and show onboarding", role: .destructive) {
+                store.eraseAllData()
+            }
+        } header: {
+            Text("Debug")
+        } footer: {
+            Text("Debug builds only. Nine months of generated history, for App Store screenshots.")
+        }
+    }
+    #endif
 
     private var aboutSection: some View {
         Section {
