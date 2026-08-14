@@ -90,12 +90,17 @@ targets:
     platform: iOS
     sources:
       - path: RepsWidget
+        # Wired explicitly below instead. The extension carries its *own* copy at
+        # RepsWidget/PrivacyInfo.xcprivacy — pointing this target at the app's copy as well
+        # made two copy commands write the same path inside the .appex, which is a hard
+        # build failure ("Multiple commands produce ...").
+        excludes: ["PrivacyInfo.xcprivacy"]
+      - path: RepsWidget/PrivacyInfo.xcprivacy
+        buildPhase: resources
       # App Intents must be compiled into the extension for Button(intent:) to run
       # in-process, and the widget needs the design tokens without duplicating them.
       - path: Reps/Intents
       - path: Reps/DesignSystem/Theme.swift
-      - path: Reps/Resources/PrivacyInfo.xcprivacy
-        buildPhase: resources
     dependencies:
       - package: RepsKit
       - sdk: WidgetKit.framework
@@ -142,5 +147,9 @@ schemes:
       gatherCoverageData: false
     run:
       config: Debug
+      # Local StoreKit products, so the paywall works in the simulator and on a device
+      # before anything exists in App Store Connect. Debug/run only — it is not part of any
+      # target and never ships. Archive builds talk to the real App Store.
+      storeKitConfiguration: Reps.storekit
     archive:
       config: Release

@@ -47,6 +47,19 @@ SWIFT_GROUP="$(grep -Eo 'group\.[a-zA-Z0-9._]+' RepsKit/Sources/RepsKit/Persiste
     || fail "app group drift: project.yml has '$YML_GROUP', Swift has '$SWIFT_GROUP'"
 echo "app group: $YML_GROUP"
 
+step "StoreKit product IDs"
+# A product ID that drifts between Swift and the StoreKit config does not error anywhere.
+# The paywall just shows "Pricing is unavailable", which is the most common way a first
+# StoreKit release goes wrong.
+SWIFT_IDS="$(grep -Eo 'com\.gradedays\.reps\.pro\.[a-z]+' Reps/Stores/PurchaseStore.swift | sort -u)"
+CONFIG_IDS="$(grep -Eo 'com\.gradedays\.reps\.pro\.[a-z]+' Reps.storekit | sort -u)"
+[[ -n "$SWIFT_IDS" ]] || fail "no product IDs found in PurchaseStore.swift"
+if [[ "$SWIFT_IDS" != "$CONFIG_IDS" ]]; then
+    printf 'Swift:\n%s\n\nReps.storekit:\n%s\n' "$SWIFT_IDS" "$CONFIG_IDS" >&2
+    fail "product IDs differ between PurchaseStore.swift and Reps.storekit"
+fi
+echo "$(echo "$SWIFT_IDS" | wc -l | tr -d ' ') product IDs agree"
+
 step "Regenerate project"
 [[ -x "$XCODEGEN" ]] || fail "xcodegen not found at $XCODEGEN (set XCODEGEN=...)"
 "$XCODEGEN" generate

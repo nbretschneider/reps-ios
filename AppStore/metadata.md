@@ -182,6 +182,26 @@ hardcoding, so whatever is typed into App Store Connect is what the user sees.
 Review notes for IAP: the paywall is reachable from Profile ▸ Reps Pro and appears once
 after onboarding. It is always dismissible, and the app is fully functional without it.
 
+### Setting these up in App Store Connect
+
+The product IDs above must match `PurchaseStore.productIDs` exactly, character for
+character. A typo does not error; the paywall just shows "Pricing is unavailable", which is
+the single most common way a first StoreKit release goes wrong.
+
+1. **Agreements, Tax, and Banking** has to show the Paid Apps agreement as *Active* before
+   any product will load, even in sandbox. This is the step that blocks people for days.
+2. Create the subscription group **Reps Pro** first, then the annual and monthly
+   subscriptions inside it. Create the lifetime unlock separately as a **non-consumable**.
+3. Each subscription needs a localized display name and description, a price, and a
+   **review screenshot of the paywall** attached to the product itself. Without that
+   screenshot the product stays in "Missing Metadata" and cannot be submitted.
+4. Add the 3-day free trial as an **Introductory Offer** on both subscriptions.
+5. Products are submitted **with** the first app version that contains them. They do not go
+   live separately.
+
+Locally none of this is needed: `Reps.storekit` is wired into the scheme's Run action, so
+the paywall works in the simulator against fake products. See CLAUDE.md.
+
 ---
 
 ## Review notes

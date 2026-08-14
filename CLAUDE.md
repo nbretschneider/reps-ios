@@ -195,6 +195,33 @@ gated either — it exists so people who are short on time still train.
 The paywall is **always dismissible** and appears once after onboarding. A push-up app earns
 a subscription by being used every day for a month, not by holding the first set hostage.
 
+### Testing purchases
+
+`Reps.storekit` defines the three products locally and is wired into the **Run** action of
+the scheme (`storeKitConfiguration` in `project.yml`). It is not a member of any target and
+never ships; archive builds talk to the real App Store.
+
+That means the paywall works in the simulator with nothing in App Store Connect: buy, and
+`Transaction.currentEntitlements` reports Pro immediately. There is no receipt server to
+agree with, because there isn't one.
+
+Resetting between runs is **Xcode ▸ Debug ▸ StoreKit ▸ Manage Transactions**, which is also
+where you delete a purchase to see the paywall again. The Editor menu on the `.storekit`
+file has the subscription-speed override, so a year passes in a few seconds and renewal and
+expiry are testable. `settings._storeKitErrors` in the file can force load and purchase
+failures — worth turning on once to see that the paywall's "Pricing is unavailable" and
+error states actually render.
+
+Three IDs have to agree or the paywall silently shows nothing: `PurchaseStore.productIDs`,
+`Reps.storekit`, and App Store Connect. `PurchaseStore` reads display names and prices off
+the `Product` rather than hardcoding them, so whatever is typed into App Store Connect is
+what the user sees — the local file's names are only for local runs.
+
+Order of operations for a real release: local `.storekit` first, then create the same three
+product IDs in App Store Connect under a subscription group named `Reps Pro`, then test in
+TestFlight with a sandbox account. A subscription cannot be submitted for review without at
+least one screenshot of the paywall attached to it in App Store Connect.
+
 ## Releasing to TestFlight
 
     ./scripts/preflight.sh
