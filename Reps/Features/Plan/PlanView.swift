@@ -18,6 +18,7 @@ struct PlanView: View {
                         if let plan = store.state.plan {
                             progressCard(plan)
                             if PlanEngine.needsMaxTest(plan) { retestCard }
+                            shapeCard
                             scheduleCard
                             settingsCard(plan)
                         } else {
@@ -100,6 +101,24 @@ struct PlanView: View {
         }
     }
 
+    /// Sits above the schedule on purpose: flipping it rewrites every row below, and the
+    /// prescription is recomputed on render, so the change is visible instantly.
+    @ViewBuilder
+    private var shapeCard: some View {
+        RCard {
+            VStack(alignment: .leading, spacing: RTheme.Spacing.stack) {
+                SectionHeader(icon: "square.stack.3d.up", title: "Session")
+                if store.planHonoursSetCount {
+                    SessionShapeControl(setCount: store.setCount) { store.setSetCount($0) }
+                } else {
+                    Text("This program prescribes its own sets, so it always runs as published.")
+                        .font(RTheme.body)
+                        .foregroundStyle(Color.rMutedForeground)
+                }
+            }
+        }
+    }
+
     private var scheduleCard: some View {
         let upcoming = store.upcomingSessions(6)
         return RCard(padding: 0) {
@@ -126,7 +145,7 @@ struct PlanView: View {
                                     .foregroundStyle(Color.rMutedForeground)
                             }
                             Spacer()
-                            SetPips(sets: session.sets, activeIndex: nil)
+                            Prescription(sets: session.sets, activeIndex: nil)
                         }
                         .padding(RTheme.Spacing.card)
                     }

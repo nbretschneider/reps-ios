@@ -214,15 +214,7 @@ def screen_session() -> str:
 <div class="screen" style="background:linear-gradient(180deg,{T['gradTop']},{T['gradBottom']});">
   <div class="statusbar" style="color:#fff;"><span>9:41</span><span>LTE</span></div>
   <div class="notch"></div>
-  <div style="display:flex;justify-content:center;margin-top:8px;">
-    <div class="pips">
-      <div class="pip" style="background:rgba(255,255,255,.45);color:#fff;">80</div>
-      <div class="pip" style="background:#fff;color:{T['gradBottom']};">30</div>
-      <div class="pip" style="background:rgba(255,255,255,.22);color:#fff;">28</div>
-      <div class="pip" style="background:rgba(255,255,255,.22);color:#fff;">30</div>
-      <div class="pip" style="background:rgba(255,255,255,.22);color:#fff;">30</div>
-    </div>
-  </div>
+  <!-- One set, so no pip row: a lone capsule above a 150pt counter is noise. -->
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;
               justify-content:center;color:#fff;">
     <div style="font-size:20px;font-weight:700;letter-spacing:1.5px;
@@ -234,7 +226,7 @@ def screen_session() -> str:
   <div style="display:flex;justify-content:center;margin-bottom:20px;">
     <div style="background:rgba(0,0,0,.28);border-radius:999px;padding:10px 16px;
                 color:#fff;font-size:13px;font-weight:700;display:flex;gap:14px;">
-      <span>93 done</span><span>198 target</span><span>Sensor</span>
+      <span>43 done</span><span>60 target</span><span>Sensor</span>
     </div>
   </div>
   <div style="display:flex;justify-content:center;gap:32px;margin-bottom:64px;">
@@ -250,15 +242,14 @@ def screen_train() -> str:
 <div class="body">
   <div class="title">Train</div>
   <div class="tiles">
-    <div class="tile"><div class="k">Today</div><div class="v">198</div></div>
-    <div class="tile"><div class="k">Week</div><div class="v">594</div></div>
-    <div class="tile"><div class="k">Month</div><div class="v">2,376</div></div>
+    <div class="tile"><div class="k">Today</div><div class="v">60</div></div>
+    <div class="tile"><div class="k">Week</div><div class="v">186</div></div>
+    <div class="tile"><div class="k">Month</div><div class="v">757</div></div>
   </div>
   <div class="card">
     <div class="hdr">Today's session</div>
-    {pips([80, 30, 28, 30, 30])}
-    <div style="margin:12px 0 4px;"><span class="big">198</span>
-      <span class="muted"> push-ups</span></div>
+    <div style="margin:2px 0 4px;"><span class="big">60</span>
+      <span class="muted"> push-ups in one set</span></div>
     <div class="cta">START TRAINING</div>
   </div>
   <div class="card">
@@ -287,12 +278,13 @@ def screen_plan() -> str:
                             color:{T['primary'] if i == 0 else T['fg']};">{when}</div>
                 <div class="cap">{total} push-ups</div>
               </div>
-              {pips(sets)}
+              {(f'<div style="font-size:20px;font-weight:700;color:{T["primary"]};">'
+                 f'{sets[0]}</div>') if len(sets) == 1 else pips(sets)}
             </div>"""
         for i, (when, total, sets) in enumerate([
-            ("Today", 198, [80, 30, 28, 30, 30]),
-            ("Wednesday Aug 5", 198, [80, 30, 28, 30, 30]),
-            ("Friday Aug 7", 208, [84, 32, 29, 32, 32]),
+            ("Today", 60, [60]),
+            ("Wednesday Aug 5", 60, [60]),
+            ("Friday Aug 7", 63, [63]),
         ])
     )
     inner = f"""
@@ -307,10 +299,24 @@ def screen_plan() -> str:
         color=T['primary'])}
       <div>
         <div style="font-size:20px;font-weight:700;">Adaptive</div>
-        <div class="cap" style="margin-top:2px;">Five sets built from your max. Steps up
+        <div class="cap" style="margin-top:2px;">Built from your max. Steps up
           when you finish, backs off when you don't.</div>
         <div style="font-size:13px;font-weight:700;color:{T['primary']};margin-top:8px;">
           Anchor: 100 max</div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="hdr">Session</div>
+    <div style="display:flex;gap:8px;">
+      <div style="flex:1;padding:12px;border-radius:12px;background:{T['primary']};color:#fff;">
+        <div style="font-size:15px;font-weight:700;">One set</div>
+        <div style="font-size:13px;opacity:.8;">About two minutes</div>
+      </div>
+      <div style="flex:1;padding:12px;border-radius:12px;background:{T['muted']};
+                  color:{T['mutedFg']};">
+        <div style="font-size:15px;font-weight:700;">Multiple sets</div>
+        <div style="font-size:13px;opacity:.8;">More volume, more time</div>
       </div>
     </div>
   </div>
@@ -323,8 +329,8 @@ def screen_plan() -> str:
 
 
 def screen_profile() -> str:
-    reps = [0, 0, 60, 40, 80, 60, 60, 91, 50, 80, 25, 50, 51, 50, 60,
-            0, 0, 0, 198, 0, 0, 60, 198, 0, 40, 198, 0, 0, 0, 0, 0]
+    reps = [0, 0, 60, 0, 62, 0, 60, 91, 0, 63, 0, 63, 30, 0, 65,
+            0, 0, 0, 65, 0, 0, 68, 65, 0, 40, 68, 0, 0, 0, 0, 0]
     best = max(reps) or 1
     cells = []
     for index, value in enumerate(reps):
@@ -345,11 +351,11 @@ def screen_profile() -> str:
 <div class="body">
   <div class="title">Profile</div>
   <div class="tiles">
-    <div class="tile"><div class="k">Today</div><div class="v">198</div></div>
-    <div class="tile"><div class="k">Week</div><div class="v">594</div></div>
+    <div class="tile"><div class="k">Today</div><div class="v">68</div></div>
+    <div class="tile"><div class="k">Week</div><div class="v">173</div></div>
   </div>
   <div class="tiles">
-    <div class="tile"><div class="k">Month</div><div class="v">1,352</div></div>
+    <div class="tile"><div class="k">Month</div><div class="v">760</div></div>
     <div class="tile"><div class="k">Year</div>
       <div class="v" style="color:{T['accent']};">11,954</div></div>
   </div>
@@ -403,7 +409,14 @@ def screen_placement() -> str:
     <div style="font-size:13px;color:{T['primary']};margin-top:8px;">
       The screen going black at the bottom of each rep is the sensor working, not a bug.</div>
   </div>
-  <div class="cta" style="margin-top:20px;">I'M READY</div>
+  <div style="margin-top:16px;display:flex;gap:8px;">
+    <div style="flex:1;padding:10px;border-radius:12px;background:{T['primary']};color:#fff;
+                text-align:center;font-size:13px;font-weight:700;">One set · 60</div>
+    <div style="flex:1;padding:10px;border-radius:12px;background:{T['muted']};
+                color:{T['mutedFg']};text-align:center;font-size:13px;font-weight:700;">
+      Multiple sets</div>
+  </div>
+  <div class="cta" style="margin-top:16px;">I'M READY</div>
 </div>"""
     return chrome(inner)
 
@@ -425,7 +438,7 @@ def screen_records() -> str:
   <div class="card">
     <div class="hdr">Records</div>
     {record("Best set", "91", "2026-08-06")}
-    {record("Best day", "198", "2026-08-19")}
+    {record("Best day", "91", "2026-08-08")}
     {record("Longest streak", "41 days", "")}
     {record("All time", "11,954", "212 sessions")}
   </div>
@@ -434,7 +447,7 @@ def screen_records() -> str:
       {ring(1.0, 72, f'<div style="font-size:26px;color:{T["accent"]};">✓</div>', color=T['accent'])}
       <div>
         <div style="font-size:20px;font-weight:700;">Done for today</div>
-        <div class="cap">198 push-ups logged.</div>
+        <div class="cap">68 push-ups logged.</div>
       </div>
     </div>
   </div>
@@ -444,8 +457,8 @@ def screen_records() -> str:
 
 FRAMES = [
     ("01-session", screen_session, "It counts every rep", "Phone on the floor. Chest down, push up."),
-    ("02-train", screen_train, "Know what to do today", "Five sets, built from your max."),
-    ("03-plan", screen_plan, "A plan that adapts", "Steps up when you finish. Backs off when you don't."),
+    ("02-train", screen_train, "One set. Two minutes.", "Not fifteen. That's why you'll actually do it."),
+    ("03-plan", screen_plan, "Got more time today?", "Multiple sets is one tap, whenever you want it."),
     ("04-profile", screen_profile, "Every number you've put in", "A month at a glance."),
     ("05-placement", screen_placement, "No watch, no camera", "The sensor your iPhone already has."),
     ("06-records", screen_records, "Streaks that survive real life", "Rest days don't break them."),

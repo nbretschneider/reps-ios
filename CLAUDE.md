@@ -4,6 +4,8 @@ Native SwiftUI iOS app for push-ups. The phone lies flat on the floor under your
 counts reps from your face descending onto it. **Fully local** — no backend, no accounts,
 no network calls except StoreKit.
 
+> Repo: `nbretschneider/reps-ios`.
+>
 > Sibling projects: `nbretschneider/grams-ios` and `nbretschneider/gradedays-ios`. Reps
 > takes the design system, persistence design and release scripts from Grams but shares no
 > code and no server.
@@ -111,13 +113,22 @@ the app and all its data.
 `PlanEngine` is pure static functions over `PlanState`. Nothing is materialized: the
 schedule on the Plan tab is recomputed on every render, which is why it can never be stale.
 
-- **Adaptive** scales five sets off the measured max with the ratios
-  `[0.80, 0.30, 0.28, 0.30, 0.30]`, stepping up 5% every three sessions. A 100-rep max gives
-  `80 · 30 · 28 · 30 · 30`.
+- **Adaptive** scales off the measured max, stepping up 5% every three sessions. How many
+  sets it splits into is `PlanState.setCount`, and **the default is one**: five sets with
+  rest is fifteen minutes, one set is two, and someone with two minutes who is told to do
+  fifteen does nothing. A 100-rep max gives `60` at one set, `80 · 32 · 30` at three, and
+  `80 · 30 · 28 · 30 · 30` at five (the original ladder, unchanged).
+  `setCount` lives on `PlanState`, not `Preferences`, because every prescription call site
+  already takes a `PlanState` — that is what kept the feature from touching a dozen
+  signatures. It is optional-backed and clamped to 1...5 on read *and* write.
+  Changing it is **not progression**: `sessionIndex`, `blockIndex` and the failure count are
+  untouched, because deciding you only have two minutes today is not a failed session.
+  Only `.adaptive` reshapes; `PlanEngine.honoursSetCount` is what the UI asks before showing
+  the control.
 - **Table** plans reproduce a published program literally, with no scaling. A named program
   that quietly rescales itself is not the program the user chose.
 - **Pyramid** climbs one rung per session.
-- **Daily goal** has no sets at all, and is the free tier's plan.
+- **Daily goal** has no sets at all: one number a day, split however you like.
 
 Progression: finishing every prescribed rep advances one session and clears the failure
 count. Falling short repeats the session. **Two consecutive failures deload the anchor 15%
@@ -167,9 +178,14 @@ zero it will not deserve until midnight.
 StoreKit 2 in `Reps/Stores/PurchaseStore.swift`. No receipt server, no third-party SDK, no
 analytics, and no network code anywhere else in the app.
 
-Free forever: counting on every engine, unlimited free sets, the daily-goal plan, the
-streak, and the last 30 days of stats. Pro: adaptive plans, the published programs, full
-history and charts, Precision mode, widgets, Health sync, CSV export.
+Free forever: counting on every engine, unlimited free sets, **the adaptive plan** (at any
+set count), the daily-goal plan, the streak, and the last 30 days of stats. Pro: the
+published programs, full history and charts, Precision mode, widgets, Health sync, CSV
+export.
+
+The adaptive plan is free on purpose. It is the daily loop, and a subscription in front of
+the daily loop gates the habit the subscription depends on. The set-count control is never
+gated either — it exists so people who are short on time still train.
 
 The paywall is **always dismissible** and appears once after onboarding. A push-up app earns
 a subscription by being used every day for a month, not by holding the first set hostage.

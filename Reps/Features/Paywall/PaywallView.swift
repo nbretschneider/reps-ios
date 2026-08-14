@@ -57,7 +57,7 @@ struct PaywallView: View {
             Text("Reps Pro")
                 .font(RTheme.title)
                 .foregroundStyle(Color.rForeground)
-            Text("The plan that adapts to you, and every number you've ever put in.")
+            Text("The published programs, every number you've ever put in, and depth on every rep.")
                 .font(RTheme.body)
                 .foregroundStyle(Color.rMutedForeground)
                 .multilineTextAlignment(.center)
@@ -68,8 +68,6 @@ struct PaywallView: View {
     private var features: some View {
         RCard {
             VStack(alignment: .leading, spacing: RTheme.Spacing.stack) {
-                feature("chart.line.uptrend.xyaxis", "Adaptive plans",
-                        "Built from your max, stepping up when you finish and backing off when you don't.")
                 feature("list.bullet.rectangle", "The classic programs",
                         "100 Push-Ups and the Prison Ladder, reproduced as published.")
                 feature("faceid", "Precision mode",
@@ -160,7 +158,7 @@ struct PaywallView: View {
                     .foregroundStyle(Color.rDestructive)
                     .multilineTextAlignment(.center)
             }
-            Text("Counting, free sets, your streak and the last 30 days stay free forever. Cancel any time in Settings.")
+            Text("Counting, your adaptive plan, free sets, your streak and the last 30 days stay free forever. Cancel any time in Settings.")
                 .font(RTheme.caption)
                 .foregroundStyle(Color.rMutedForeground)
                 .multilineTextAlignment(.center)

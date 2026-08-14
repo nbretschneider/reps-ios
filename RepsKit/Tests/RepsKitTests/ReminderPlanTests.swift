@@ -121,6 +121,24 @@ struct ReminderPlanTests {
         #expect(after.map(\.dayKey) == ["2026-08-04"])
     }
 
+    @Test("A one-set reminder does not repeat the number twice")
+    func singleSetCopy() {
+        // The title already carries the number. Listing "60" again as the set breakdown
+        // reads like a bug.
+        let days = ReminderPlan.daysToRemind(state: state(), horizon: 2, calendar: utc, now: monday)
+        // A 20-rep max at 0.60 is a 12-rep working set.
+        #expect(days.first?.title == "12 push-ups today")
+        #expect(days.first?.body == "One set. Two minutes.")
+    }
+
+    @Test("A multi-set reminder lists the sets")
+    func multiSetCopy() {
+        var multi = state()
+        multi.plan?.setCount = 3
+        let days = ReminderPlan.daysToRemind(state: multi, horizon: 2, calendar: utc, now: monday)
+        #expect(days.first?.body.contains("·") == true)
+    }
+
     @Test("A streak is only mentioned once it is worth protecting")
     func streakLineAppearsLate() {
         let short = ReminderPlan.daysToRemind(state: state(), horizon: 2, calendar: utc, now: monday)

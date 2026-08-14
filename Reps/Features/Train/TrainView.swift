@@ -65,13 +65,13 @@ struct TrainView: View {
             RCard {
                 VStack(alignment: .leading, spacing: RTheme.Spacing.stack) {
                     SectionHeader(icon: "figure.strengthtraining.functional", title: "Today's session")
-                    SetPips(sets: next.sets, activeIndex: nil)
+                    Prescription(sets: next.sets, activeIndex: nil)
                     HStack(alignment: .firstTextBaseline, spacing: RTheme.Spacing.tight) {
                         Text("\(next.total)")
                             .font(RTheme.hero)
                             .monospacedDigit()
                             .foregroundStyle(Color.rForeground)
-                        Text("push-ups")
+                        Text(next.sets.count > 1 ? "push-ups in \(next.sets.count) sets" : "push-ups in one set")
                             .font(RTheme.body)
                             .foregroundStyle(Color.rMutedForeground)
                     }
@@ -131,7 +131,7 @@ struct TrainView: View {
             Text(friendlyDate(session.dayKey))
                 .font(RTheme.bodyMedium)
                 .foregroundStyle(Color.rForeground)
-            SetPips(sets: session.sets, activeIndex: nil)
+            Prescription(sets: session.sets, activeIndex: nil)
         }
     }
 

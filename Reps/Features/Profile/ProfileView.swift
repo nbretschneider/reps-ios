@@ -190,7 +190,7 @@ struct ProfileView: View {
                         Text("Reps Pro")
                             .font(RTheme.heading)
                             .foregroundStyle(Color.rForeground)
-                        Text("Adaptive plans, full history, Precision mode, widgets.")
+                        Text("The classic programs, full history, Precision mode, widgets.")
                             .font(RTheme.caption)
                             .foregroundStyle(Color.rMutedForeground)
                             .multilineTextAlignment(.leading)

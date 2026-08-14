@@ -66,7 +66,10 @@ public enum ReminderPlan {
                 Day(
                     dayKey: session.dayKey,
                     title: "\(session.total) push-ups today",
-                    body: streakLine(streak) ?? Format.sets(session.sets)
+                    // For a single set, `Format.sets` would just repeat the number already
+                    // in the title. Say how long it takes instead.
+                    body: streakLine(streak)
+                        ?? (session.sets.count == 1 ? "One set. Two minutes." : Format.sets(session.sets))
                 )
             }
     }

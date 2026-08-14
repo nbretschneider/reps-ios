@@ -49,7 +49,7 @@ disallowed. Plurals of an indexed singular are matched automatically, but `pushu
 ## Promotional text (170 char limit, editable without a new build)
 
 ```
-Your iPhone already has the sensor. Put it on the floor under your chest, and Reps counts every rep out loud while your music keeps playing.
+One set. Two minutes. Put your iPhone on the floor under your chest and it counts every rep out loud, while your music keeps playing.
 ```
 (139 characters)
 
@@ -71,12 +71,18 @@ The screen goes dark at the bottom of every rep, because your chest is on top of
 Reps speaks the count instead. Your music keeps playing underneath, ducking just enough
 that you hear the number and then it comes back.
 
-TELLS YOU WHAT TO DO
+ONE SET, NOT FIFTEEN MINUTES
 
-Reps starts by asking one question: how many push-ups can you do in a row? Everything
-after that is built from your answer. Five sets, scaled to you, stepping up as you finish
-them and backing off when you do not. Two sessions in a row you could not complete and the
-load comes down by itself. No spreadsheet, no guessing.
+Reps starts by asking one question: how many push-ups can you do in a row? Everything after
+that is built from your answer.
+
+Most push-up apps hand you five sets with rest between them. That is fifteen minutes, and
+most days you do not have fifteen minutes. So Reps gives you one working set to a number,
+scaled to you, stepping up as you finish it and backing off when you do not. Two minutes on
+the floor and the day is done.
+
+Want more? Turning on multiple sets is one tap, on the Plan tab or on the screen right
+before you start. Two to five sets, whenever you have the time for it.
 
 Prefer a published program? The classic six week hundred push-up table and the prison
 ladder are both here, reproduced exactly as written.
@@ -110,11 +116,11 @@ exported as a spreadsheet whenever you like.
 
 FREE FOREVER
 
-Rep counting, free sets, the daily goal, your streak and the last 30 days of history are
-free and always will be.
+Rep counting, your adaptive plan, free sets, the daily goal, your streak and the last 30
+days of history are free and always will be.
 
-Reps Pro adds the adaptive plan, the published programs, your full history and charts,
-Precision mode, widgets, Apple Health, and export.
+Reps Pro adds the published programs, your full history and charts, Precision mode,
+widgets, Apple Health, and export.
 ```
 
 ---
@@ -202,8 +208,9 @@ Rendered by `python3 AppStore/marketing/build_frames.py`. Six frames, in this or
 1. **The active set.** The full-bleed magenta gradient with a huge TO GO number. This is
    the one that has to earn the tap, and it is the only screen that looks like nothing else
    in the category.
-2. **Train tab.** Today's session, the set pips, START TRAINING.
-3. **Plan tab.** The block ring, the anchor, the upcoming schedule.
+2. **Train tab.** Today's number, one set, START TRAINING.
+3. **Plan tab.** The block ring, the anchor, the one-set / multiple-sets switch, the
+   upcoming schedule.
 4. **Profile.** The month grid of rings.
 5. **Placement.** Phone on the floor, and the sentence about the screen going dark.
 6. **Records and streak.**

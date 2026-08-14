@@ -101,7 +101,12 @@ struct OnboardingFlow: View {
                         Text("Your first session would be")
                             .font(RTheme.caption)
                             .foregroundStyle(Color.rMutedForeground)
-                        SetPips(sets: preview, activeIndex: nil)
+                        Prescription(sets: preview, activeIndex: nil)
+                        // Onboarding never asks about this. The default is one set and
+                        // the setting is one tap away once they are inside.
+                        Text("One set. You can split it into sets any time.")
+                            .font(RTheme.caption)
+                            .foregroundStyle(Color.rMutedForeground)
                     }
                     .padding(.top, RTheme.Spacing.card)
                     .transition(.opacity)

@@ -13,10 +13,19 @@ struct PlacementSheet: View {
     @Environment(TabRouter.self) private var router
     @Environment(\.dismiss) private var dismiss
 
+    /// Passed in for a free set, which has no plan behind it. For a plan session this is
+    /// ignored in favour of the live prescription, so changing the shape on this screen
+    /// updates what you are about to do.
     let targets: [Int]
     let onStart: (WorkoutSession) -> Void
 
     @State private var engine: CountingEngine = .proximity
+
+    /// A plan session re-reads its targets every render. A free set keeps the empty array
+    /// it was handed, because a free set has no prescription to reshape.
+    private var liveTargets: [Int] {
+        targets.isEmpty ? [] : (store.nextSession?.sets ?? targets)
+    }
 
     private var available: [CountingEngine] { RepDetectorFactory.availableEngines() }
 
@@ -27,9 +36,9 @@ struct PlacementSheet: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: RTheme.Spacing.card) {
                         illustration
+                        if !targets.isEmpty { prescription }
                         enginePicker
                         explanation
-                        if !targets.isEmpty { prescription }
                     }
                     .padding(RTheme.Spacing.page)
                 }
@@ -134,14 +143,41 @@ struct PlacementSheet: View {
         .background(Color.rPrimary.opacity(0.10), in: RoundedRectangle(cornerRadius: RTheme.Radius.control, style: .continuous))
     }
 
+    /// Today's work, and the one control that changes it.
+    ///
+    /// The shape switch lives here and not only in Settings because this is the screen
+    /// where the decision actually gets made. "I don't have fifteen minutes today" is a
+    /// thought people have with the phone already in their hand, on the floor.
     private var prescription: some View {
-        VStack(alignment: .leading, spacing: RTheme.Spacing.inline) {
+        VStack(alignment: .leading, spacing: RTheme.Spacing.stack) {
             SectionHeader(icon: "list.number", title: "Today")
-            SetPips(sets: targets, activeIndex: 0)
-            Text("\(targets.reduce(0, +)) push-ups across \(targets.count) sets, \(store.state.settings.restSeconds)s rest between.")
-                .font(RTheme.caption)
-                .foregroundStyle(Color.rMutedForeground)
+
+            HStack(alignment: .firstTextBaseline, spacing: RTheme.Spacing.inline) {
+                Prescription(sets: liveTargets, activeIndex: 0)
+                Spacer(minLength: 0)
+                Text(summary)
+                    .font(RTheme.caption)
+                    .foregroundStyle(Color.rMutedForeground)
+            }
+
+            if store.planHonoursSetCount {
+                SessionShapeControl(setCount: store.setCount, isCompact: true) {
+                    store.setSetCount($0)
+                }
+            }
         }
+        .padding(RTheme.Spacing.card)
+        .background(Color.rCard, in: RoundedRectangle(cornerRadius: RTheme.Radius.card, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: RTheme.Radius.card, style: .continuous)
+                .stroke(Color.rCardBorder, lineWidth: 1)
+        )
+    }
+
+    private var summary: String {
+        let total = liveTargets.reduce(0, +)
+        guard liveTargets.count > 1 else { return "\(total) push-ups in one set" }
+        return "\(total) across \(liveTargets.count) sets, \(store.state.settings.restSeconds)s rest"
     }
 
     private func start() {
@@ -149,8 +185,10 @@ struct PlacementSheet: View {
         var preferences = store.state.settings
         preferences.engine = engine
         let plan = store.state.plan
+        // `liveTargets`, not `targets` — the shape may have been changed on this very
+        // screen, and starting the session the user was looking at is the whole point.
         onStart(WorkoutSession(
-            targets: targets,
+            targets: liveTargets,
             planID: targets.isEmpty ? nil : plan?.planID,
             planSessionIndex: targets.isEmpty ? nil : store.nextSession?.sessionIndex,
             preferences: preferences

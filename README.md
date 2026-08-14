@@ -18,7 +18,7 @@ makes anyone stronger.
 Reps is built around one question: **what do I do today, and did I do it?** Three tabs, and
 two of them are just answering that.
 
-- **Train** tells you today's sets and counts them.
+- **Train** tells you today's number and counts it.
 - **Plan** decides what those sets are, and changes them when you get better or worse.
 - **Profile** is every number you have ever put in.
 
@@ -44,11 +44,15 @@ out loud**. Your music keeps playing underneath it.
   days leave the numerator *and* the denominator of every average.
 - **Today does not break your streak until it is over.** Opening the app in the morning
   should not show you a zero you have not earned yet.
+- **One set by default.** Five sets with rest between them is fifteen minutes, and most
+  people have two. Reps asks for one working set to a number. If you want it split into
+  three, that is one tap on the Plan tab, the placement screen, or Settings.
 - **A short set is a real result.** Stopping at 22 of 30 records 22 of 30, and the plan uses
   it — two of those in a row and the load comes down.
 - **No leaderboards, no friends, no bot rival.** The only person in this app is you.
-- **The paywall is always dismissible.** Counting, free sets, your streak and the last 30
-  days are free forever.
+- **The paywall is always dismissible.** Counting, your adaptive plan, free sets, your
+  streak and the last 30 days are free forever. Pro is the published programs, the full
+  history, Precision mode, widgets and Health.
 
 ## Layout
 

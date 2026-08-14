@@ -8,7 +8,8 @@ private func makeState(
     sessionIndex: Int = 0,
     blockIndex: Int = 0,
     failures: Int = 0,
-    weekdays: Set<Int> = [2, 4, 6]
+    weekdays: Set<Int> = [2, 4, 6],
+    setCount: Int = PlanState.defaultSetCount
 ) -> PlanState {
     PlanState(
         planID: planID,
@@ -17,7 +18,8 @@ private func makeState(
         blockIndex: blockIndex,
         consecutiveFailures: failures,
         trainingWeekdays: weekdays,
-        startedOn: "2026-08-03"
+        startedOn: "2026-08-03",
+        setCount: setCount
     )
 }
 
@@ -34,16 +36,114 @@ private func workout(_ sets: [(target: Int, done: Int)], day: String = "2026-08-
     )
 }
 
+@Suite("Session shape")
+struct SessionShapeTests {
+
+    @Test("A session is one set unless the user asks for more")
+    func oneSetIsTheDefault() {
+        // The whole product decision, in one assertion. Five sets is fifteen minutes and
+        // most people do not have fifteen minutes.
+        let state = makeState(max: 100)
+        #expect(state.setCount == 1)
+        #expect(state.isSingleSet)
+        #expect(PlanEngine.sets(for: state, sessionIndex: 0) == [60])
+        #expect(PlanEngine.total(for: state, sessionIndex: 0) == 60)
+    }
+
+    @Test("Turning on multiple sets gives three by default")
+    func threeSetsIsTheMultiDefault() {
+        let state = makeState(max: 100, setCount: PlanEngine.defaultMultiSetCount)
+        #expect(PlanEngine.sets(for: state, sessionIndex: 0) == [80, 32, 30])
+        #expect(state.isSingleSet == false)
+    }
+
+    @Test("Five sets still gives the original ladder, unchanged")
+    func fiveSetsIsTheOldLadder() {
+        // Nothing regresses for someone who turns the shape all the way up.
+        let state = makeState(max: 100, setCount: 5)
+        #expect(PlanEngine.sets(for: state, sessionIndex: 0) == [80, 30, 28, 30, 30])
+        #expect(PlanEngine.total(for: state, sessionIndex: 0) == 198)
+    }
+
+    @Test("Every set count from one to five prescribes that many sets")
+    func setCountIsHonoured() {
+        for count in 1...PlanState.maxSetCount {
+            let sets = PlanEngine.sets(for: makeState(max: 100, setCount: count), sessionIndex: 0)
+            #expect(sets.count == count)
+            #expect(sets.allSatisfy { $0 >= 1 })
+        }
+    }
+
+    @Test("More sets is always more total volume")
+    func moreSetsIsMoreVolume() {
+        let totals = (1...PlanState.maxSetCount).map {
+            PlanEngine.total(for: makeState(max: 100, setCount: $0), sessionIndex: 0)
+        }
+        #expect(zip(totals, totals.dropFirst()).allSatisfy { $0 < $1 })
+    }
+
+    @Test("A nonsense set count is clamped rather than trusted")
+    func setCountIsClamped() {
+        #expect(makeState(setCount: 0).setCount == 1)
+        #expect(makeState(setCount: -4).setCount == 1)
+        #expect(makeState(setCount: 99).setCount == PlanState.maxSetCount)
+
+        var state = makeState()
+        state.setCount = 40
+        #expect(state.setCount == PlanState.maxSetCount)
+        state.setCount = 0
+        #expect(state.setCount == 1)
+    }
+
+    @Test("A plan file written before set counts existed reads as one set")
+    func decodesWithoutTheField() throws {
+        // The rule that keeps a bad decode from becoming a dead end: added fields are
+        // optional, forever. This is the shape of a stored plan from before this feature.
+        let json = """
+        {"planID":"adaptive","baseMax":40,"sessionIndex":2,"blockIndex":0,
+         "consecutiveFailures":0,"trainingWeekdays":[2,4,6],"startedOn":"2026-08-03",
+         "dailyGoal":100}
+        """
+        let decoded = try StoredDate.makeDecoder().decode(PlanState.self, from: Data(json.utf8))
+        #expect(decoded.setCount == 1)
+        #expect(decoded.baseMax == 40)
+        #expect(PlanEngine.sets(for: decoded, sessionIndex: 0) == [24])
+    }
+
+    @Test("The set count survives a round trip")
+    func roundTrips() throws {
+        let state = makeState(max: 55, setCount: 3)
+        let data = try StoredDate.makeEncoder().encode(state)
+        #expect(try StoredDate.makeDecoder().decode(PlanState.self, from: data) == state)
+    }
+
+    @Test("Changing the shape is not progression")
+    func shapeIsNotProgress() {
+        // Switching to three sets must not advance the plan, bank a block, or clear a
+        // failure. It is how today looks, not where you are.
+        var state = makeState(max: 100, sessionIndex: 7, blockIndex: 2, failures: 1)
+        state.setCount = 3
+        #expect(state.sessionIndex == 7)
+        #expect(state.blockIndex == 2)
+        #expect(state.consecutiveFailures == 1)
+        #expect(state.baseMax == 100)
+    }
+
+    @Test("Only the adaptive plan reshapes; a published program is what it says it is")
+    func namedProgramsIgnoreTheShape() {
+        for planID in ["hundred", "pyramid"] {
+            let single = makeState(planID: planID, max: 40, setCount: 1)
+            let multi = makeState(planID: planID, max: 40, setCount: 5)
+            #expect(PlanEngine.sets(for: single, sessionIndex: 0)
+                    == PlanEngine.sets(for: multi, sessionIndex: 0))
+            #expect(PlanEngine.honoursSetCount(single) == false)
+        }
+        #expect(PlanEngine.honoursSetCount(makeState()))
+    }
+}
+
 @Suite("Adaptive prescription")
 struct AdaptivePrescriptionTests {
-
-    @Test("A 100-rep max prescribes the reference ladder")
-    func referenceLadder() {
-        // The shape the whole plan is built around: one near-max opening set, four
-        // back-off sets, roughly twice the max in total.
-        #expect(PlanEngine.sets(for: makeState(max: 100), sessionIndex: 0) == [80, 30, 28, 30, 30])
-        #expect(PlanEngine.total(for: makeState(max: 100), sessionIndex: 0) == 198)
-    }
 
     @Test("Load holds for three sessions, then steps up")
     func stepsUpEveryThirdSession() {
@@ -260,8 +360,11 @@ struct PlanCatalogTests {
         #expect(second.reduce(0, +) > first.reduce(0, +))
     }
 
-    @Test("Only the daily-goal plan is free")
-    func onlyDailyGoalIsFree() {
-        #expect(PlanCatalog.all.filter { !$0.isPro }.map(\.id) == [PlanCatalog.dailyGoalID])
+    @Test("The default plan is free; the published programs are not")
+    func adaptiveAndDailyGoalAreFree() {
+        // The daily loop has to be free or the subscription has no habit to attach to.
+        let free = Set(PlanCatalog.all.filter { !$0.isPro }.map(\.id))
+        #expect(free == [PlanCatalog.adaptiveID, PlanCatalog.dailyGoalID])
+        #expect(PlanCatalog.all.filter { $0.isPro }.map(\.id).sorted() == ["hundred", "pyramid"])
     }
 }

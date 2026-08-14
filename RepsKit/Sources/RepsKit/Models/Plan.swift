@@ -70,6 +70,9 @@ public struct PlanState: Codable, Hashable, Sendable {
     public var startedOn: String
     /// Only meaningful for `.dailyGoal`.
     public var dailyGoal: Int
+    /// Backing store for `setCount`. Optional, forever: a `state.json` written before this
+    /// field existed still has to decode, and an undecodable file is a dead end.
+    private var setCountValue: Int?
 
     public init(
         planID: String,
@@ -79,7 +82,8 @@ public struct PlanState: Codable, Hashable, Sendable {
         consecutiveFailures: Int = 0,
         trainingWeekdays: Set<Int> = [2, 4, 6],   // Mon / Wed / Fri
         startedOn: String,
-        dailyGoal: Int = 100
+        dailyGoal: Int = 100,
+        setCount: Int = PlanState.defaultSetCount
     ) {
         self.planID = planID
         self.baseMax = baseMax
@@ -89,6 +93,33 @@ public struct PlanState: Codable, Hashable, Sendable {
         self.trainingWeekdays = trainingWeekdays
         self.startedOn = startedOn
         self.dailyGoal = dailyGoal
+        self.setCountValue = Self.clampSetCount(setCount)
+    }
+
+    /// One set. This is the product decision, not a placeholder.
+    ///
+    /// Five sets with rest between them is fifteen minutes. One set is two. Someone who has
+    /// two minutes and is told to do fifteen does nothing at all, and a push-up app only
+    /// works if it gets used on the days you do not feel like using it.
+    public static let defaultSetCount = 1
+    /// Past five the rest timers dominate and it stops being a thing anyone finishes.
+    public static let maxSetCount = 5
+
+    /// How many sets a session is split into, 1...5.
+    ///
+    /// Clamped on the way in *and* on the way out, so a hand-edited or future-written file
+    /// carrying a nonsense value still produces a session someone can do.
+    public var setCount: Int {
+        get { Self.clampSetCount(setCountValue ?? Self.defaultSetCount) }
+        set { setCountValue = Self.clampSetCount(newValue) }
+    }
+
+    /// True when the session is a single working set. The UI reads this to drop the set
+    /// pips entirely — one pip next to the hero number reads as a stray chip.
+    public var isSingleSet: Bool { setCount == 1 }
+
+    private static func clampSetCount(_ value: Int) -> Int {
+        min(maxSetCount, max(1, value))
     }
 }
 

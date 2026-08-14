@@ -62,7 +62,7 @@ struct SessionView: View {
 
     private var workingScreen: some View {
         VStack(spacing: 0) {
-            if !session.targets.isEmpty {
+            if session.targets.count > 1 {
                 SetPips(
                     sets: session.targets,
                     activeIndex: session.setIndex,

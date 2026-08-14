@@ -115,6 +115,26 @@ final class RepsStore {
         mutate(.setPlan(plan))
     }
 
+    /// Change how many sets a session is split into.
+    ///
+    /// Deliberately *only* touches the shape: `sessionIndex`, `blockIndex` and the failure
+    /// count are untouched, because deciding you only have two minutes today is not a
+    /// failed session and must not deload anything.
+    func setSetCount(_ count: Int) {
+        guard var plan = state.plan else { return }
+        plan.setCount = count
+        mutate(.setPlan(plan))
+    }
+
+    /// Does the current plan respond to the set-count control? Only the adaptive one does;
+    /// a published program is what it says it is.
+    var planHonoursSetCount: Bool {
+        guard let plan = state.plan else { return false }
+        return PlanEngine.honoursSetCount(plan)
+    }
+
+    var setCount: Int { state.plan?.setCount ?? PlanState.defaultSetCount }
+
     func update(_ transform: (inout Preferences) -> Void) {
         var preferences = state.settings
         transform(&preferences)

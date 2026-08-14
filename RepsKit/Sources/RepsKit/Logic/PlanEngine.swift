@@ -10,11 +10,14 @@ public enum PlanCatalog {
         PlanTemplate(
             id: adaptiveID,
             name: "Adaptive",
-            summary: "Five sets built from your max. Steps up when you finish, backs off when you don't.",
+            summary: "Built from your max. Steps up when you finish, backs off when you don't.",
             kind: .adaptive,
             sessionsPerBlock: 30,
             sessionsPerWeek: 3,
-            isPro: true
+            // Free. This is the app's default plan and the whole daily loop; putting a
+            // paywall in front of it would gate the habit the subscription depends on.
+            // Pro is the published programs, the full history, and the extras.
+            isPro: false
         ),
         PlanTemplate(
             id: "hundred",
@@ -75,10 +78,38 @@ enum PlanTables {
 /// Nothing here reads or writes storage and nothing is cached. The schedule shown on the
 /// Plan tab is recomputed on every render, which is why it can never be stale.
 public enum PlanEngine {
-    /// The adaptive prescription's shape: one near-max opening set, then four back-off
-    /// sets. Sums to roughly twice the user's max, which is the volume the published
-    /// six-week programs converge on.
-    static let adaptiveRatios: [Double] = [0.80, 0.30, 0.28, 0.30, 0.30]
+    /// The adaptive prescription, as fractions of the user's max, keyed by how many sets
+    /// the session is split into.
+    ///
+    /// **One set is the default**, and it is not a token version of the real thing: 0.60 of
+    /// max is a genuine working set, repeatable three times a week, and the +5%-per-level
+    /// progression carries it to 0.87 of max by the end of a 30-session block. Finishing a
+    /// block doing nearly your old max in one unbroken set is exactly the right moment to
+    /// re-test, which is what the block boundary already prompts for.
+    ///
+    /// The five-set row is the original ladder, unchanged, so turning this all the way up
+    /// gives back exactly what the plan used to prescribe.
+    static let adaptiveRatios: [Int: [Double]] = [
+        1: [0.60],
+        2: [0.75, 0.35],
+        3: [0.80, 0.32, 0.30],
+        4: [0.80, 0.30, 0.28, 0.30],
+        5: [0.80, 0.30, 0.28, 0.30, 0.30]
+    ]
+
+    /// What "Multiple sets" turns on. Three is enough to feel like a session and short
+    /// enough to finish.
+    public static let defaultMultiSetCount = 3
+
+    /// Does this plan's prescription respond to `PlanState.setCount`?
+    ///
+    /// Only the adaptive one does. A `.table` plan reproduces a published program literally
+    /// and a `.pyramid` *is* its shape, so reshaping either would make it a different
+    /// program wearing the same name. The UI reads this to hide the control rather than
+    /// offer one that does nothing.
+    public static func honoursSetCount(_ state: PlanState) -> Bool {
+        PlanCatalog.templateOrDefault(state.planID).kind == .adaptive
+    }
 
     /// How many sessions at one level before the load steps up.
     static let sessionsPerLevel = 3
@@ -100,7 +131,10 @@ public enum PlanEngine {
         case .adaptive:
             let level = max(0, sessionIndex) / sessionsPerLevel
             let scale = 1 + Double(level) * levelIncrement
-            return adaptiveRatios.map { ratio in
+            // `setCount` is clamped by its accessor, so the lookup cannot miss. The
+            // fallback is the single set rather than a crash or an empty session.
+            let ratios = adaptiveRatios[state.setCount] ?? adaptiveRatios[1]!
+            return ratios.map { ratio in
                 max(1, Int((Double(state.baseMax) * ratio * scale).rounded()))
             }
 

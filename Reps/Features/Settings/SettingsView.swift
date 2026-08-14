@@ -14,6 +14,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            sessionSection
             countingSection
             restSection
             remindersSection
@@ -52,6 +53,28 @@ struct SettingsView: View {
     }
 
     // MARK: - Sections
+
+    @ViewBuilder
+    private var sessionSection: some View {
+        Section {
+            if store.planHonoursSetCount {
+                Picker("Sets per session", selection: setCountBinding) {
+                    Text("One set").tag(1)
+                    ForEach(2...PlanState.maxSetCount, id: \.self) { count in
+                        Text("\(count) sets").tag(count)
+                    }
+                }
+            } else {
+                LabeledContent("Sets per session", value: "Set by the program")
+            }
+        } header: {
+            Text("Session")
+        } footer: {
+            Text(store.planHonoursSetCount
+                 ? "One set is about two minutes. Splitting it into sets adds volume and rest, and takes longer."
+                 : "A published program prescribes its own sets and runs exactly as written.")
+        }
+    }
 
     private var countingSection: some View {
         Section {
@@ -163,6 +186,11 @@ struct SettingsView: View {
     // `update`, which persists before the value is observable. A direct binding would let
     // the UI show a preference that never made it to disk.
 
+    /// Writes the plan, not the preferences — the shape lives on `PlanState` so that every
+    /// prescription call site reads it without a signature change.
+    private var setCountBinding: Binding<Int> {
+        Binding(get: { store.setCount }, set: { store.setSetCount($0) })
+    }
     private var engineBinding: Binding<CountingEngine> {
         Binding(get: { store.state.settings.engine }, set: { value in store.update { $0.engine = value } })
     }
