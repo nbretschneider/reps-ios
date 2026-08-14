@@ -38,10 +38,14 @@ struct SessionShapeControl: View {
             }
 
             if !isSingle {
+                // `onIncrement`/`onDecrement` rather than a `Binding`: `Binding(get:set:)`
+                // now wants `@isolated(any) @Sendable` closures, and `onChange` is a plain
+                // stored function value. Passing nil at a bound also greys out that half of
+                // the control, which the value-based initializer does not do.
                 Stepper(
                     "\(setCount) sets",
-                    value: Binding(get: { setCount }, set: onChange),
-                    in: 2...PlanState.maxSetCount
+                    onIncrement: setCount < PlanState.maxSetCount ? { onChange(setCount + 1) } : nil,
+                    onDecrement: setCount > 2 ? { onChange(setCount - 1) } : nil
                 )
                 .font(RTheme.body)
                 .foregroundStyle(Color.rForeground)

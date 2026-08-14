@@ -26,10 +26,11 @@ final class PurchaseStore {
     private(set) var isLoading = false
     private(set) var lastError: String?
 
-    /// `nonisolated(unsafe)` only so `deinit` can cancel it. A `deinit` on a main-actor
-    /// class cannot touch isolated state, and leaking the listener for the app's lifetime
-    /// is the alternative.
-    private nonisolated(unsafe) var updatesTask: Task<Void, Never>?
+    /// `nonisolated` only so `deinit` can cancel it. A `deinit` on a main-actor class
+    /// cannot touch isolated state, and leaking the listener for the app's lifetime is the
+    /// alternative. Plain `nonisolated` rather than `nonisolated(unsafe)`, because `Task`
+    /// is already `Sendable` and the unsafe escape hatch buys nothing.
+    private nonisolated var updatesTask: Task<Void, Never>?
 
     func start() async {
         // The listener has to be running before the first entitlement check, or a

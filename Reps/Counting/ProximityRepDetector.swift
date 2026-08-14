@@ -57,11 +57,14 @@ final class ProximityRepDetector: RepDetector {
             object: device,
             queue: .main
         ) { [weak self] _ in
-            // The notification carries no payload; the current state is read off the
-            // device. Hopping to the main actor explicitly because the queue argument
-            // only promises the main *thread*.
-            let isNear = UIDevice.current.proximityState
-            MainActor.assumeIsolated { self?.handle(isNear: isNear) }
+            // The notification carries no payload, so the current state is read off the
+            // device. `queue: .main` only promises the main *thread*, so hop to the main
+            // actor explicitly — and read `UIDevice` inside that hop, because
+            // `UIDevice.current` and `proximityState` are both main-actor isolated and the
+            // notification block itself is `@Sendable`.
+            MainActor.assumeIsolated {
+                self?.handle(isNear: UIDevice.current.proximityState)
+            }
         }
     }
 
@@ -91,9 +94,14 @@ final class ProximityRepDetector: RepDetector {
         }
     }
 
-    deinit {
-        if let observer { NotificationCenter.default.removeObserver(observer) }
-    }
+    // No `deinit` teardown on purpose. A nonisolated `deinit` on a main-actor class cannot
+    // touch `observer`, whose type is a non-Sendable `any NSObjectProtocol`, and Swift 6
+    // rejects it outright.
+    //
+    // `stop()` is the sole teardown path, and `WorkoutSession.end()` always calls it — from
+    // `SessionView.onDisappear` and from the summary screen. The observer block captures
+    // `self` weakly, so even a missed `stop()` leaks one dead notification-center entry
+    // rather than the detector itself.
 }
 
 /// The always-available fallback: one tap, one rep.
