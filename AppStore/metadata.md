@@ -135,14 +135,32 @@ First release. Put your phone on the floor and find out how many you can do.
 
 ## Support and marketing URLs
 
-- Support URL: `https://gradedays.com/reps/support.html`
-- Marketing URL: `https://gradedays.com/reps/`
-- Privacy policy URL: `https://gradedays.com/reps/privacy-policy.html` (required, even with
-  no data collection)
+| Field | URL | Required |
+|---|---|---|
+| Privacy Policy URL | `https://nbretschneider.github.io/reps/privacy-policy.html` | **yes** |
+| Support URL | `https://nbretschneider.github.io/reps/support.html` | **yes** |
+| Marketing URL | `https://nbretschneider.github.io/reps/` | no |
 
-The pages live in `AppStore/web/` and follow Grams' flat-file convention. Deploy by copying
-that directory to `gradedays.com/reps/` the same way the Grams pages were deployed. The
-privacy URL must resolve **before** submission; App Store Connect fetches it.
+### Hosting
+
+Same arrangement as Grams: a separate **public** repo, `nbretschneider/reps`, holding the
+three files at its root and served by GitHub Pages. Not gradedays.com — that domain is a
+full Vite/Express app, so putting static pages on it is a deployment rather than a copy,
+and a submission should never wait on one.
+
+The source of truth is `AppStore/web/` in this repo. Edit here, copy to the pages repo, so
+the pages and the submission pack cannot drift apart.
+
+To publish:
+
+1. github.com ▸ **New repository** ▸ name `reps` ▸ **Public** ▸ Create.
+2. Upload `index.html`, `privacy-policy.html`, `support.html`, `README.md` from
+   `AppStore/web/` to the root.
+3. That repo's **Settings ▸ Pages** ▸ Source: *Deploy from a branch*, branch `main`,
+   folder `/ (root)` ▸ Save. Live in a minute or two.
+
+**The privacy URL must resolve before you submit** — App Store Connect fetches it. The URLs
+can be changed later without shipping a new build.
 
 ---
 
