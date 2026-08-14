@@ -50,8 +50,13 @@ Rules both machines follow:
 
 1. **A rep is emitted on the upstroke.** That is how people count out loud, and it means a
    set abandoned at the bottom scores the reps that finished rather than one phantom extra.
-2. **Phases shorter than `minPhase` (180 ms) are ignored** and do not advance the debounce
-   clock, so a burst of sensor chatter cannot ratchet its way into a rep.
+2. **A phase counts only if the signal held still for `minPhase` (180 ms) before the edge
+   that ends it.** Measure that from the last *raw* change, including rejected ones — not
+   from the last accepted transition. Measuring from the last accepted transition is a bug
+   that shipped once and cost a test: no single 20 ms flicker clears 180 ms, but the gap
+   from the first edge keeps growing, so the machine accepts an edge every 180 ms and
+   scores a rep each time. Sustained chatter ratcheted itself into reps at a steady clip,
+   which is exactly what the debounce exists to prevent.
 3. **A descent longer than `maxDescent` (8 s) is a pause, not a rep.** The machine emits
    `.abandoned` and resets to `.up` without counting. A long rest *at the top* is fine and
    must never block the next rep.

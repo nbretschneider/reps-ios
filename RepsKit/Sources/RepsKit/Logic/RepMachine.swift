@@ -52,10 +52,22 @@ public struct ProximityRepMachine: Sendable {
     public private(set) var count: Int = 0
 
     private let timing: RepTiming
-    /// Timestamp of the last *accepted* transition. Bounces are ignored without updating
-    /// it, so a burst of chatter cannot ratchet the debounce window forward.
-    private var lastTransition: TimeInterval?
-    private var isNear = false
+
+    /// The last value the sensor reported, whether or not it was believed. Nil until the
+    /// first reading.
+    private var raw: Bool?
+    /// When `raw` last changed. **Every** raw change advances this, including ones that get
+    /// rejected — that is what makes the debounce a debounce.
+    ///
+    /// Measuring instead from the last *accepted* transition is a real bug that shipped in
+    /// the first cut of this file: 20 ms flicker never clears `minPhase` individually, but
+    /// the gap from the first edge keeps growing, so at 180 ms the machine accepts one and
+    /// scores a rep, then does it again every 180 ms. Sustained chatter ratcheted itself
+    /// into reps at a steady clip, which is precisely what the debounce exists to prevent.
+    private var lastRawChange: TimeInterval = 0
+    /// When the believed phase last changed. Rejected edges never touch this, so a bounce
+    /// mid-descent does not shorten the descent the rep is measured against.
+    private var lastPhaseChange: TimeInterval?
 
     public init(timing: RepTiming = .default) {
         self.timing = timing
@@ -64,33 +76,39 @@ public struct ProximityRepMachine: Sendable {
     /// Feed one sensor reading. Returns everything that happened as a result — usually
     /// nothing, since the sensor only reports on change.
     public mutating func consume(isNear sample: Bool, at t: TimeInterval) -> [RepOutput] {
-        guard sample != isNear else { return [] }
+        guard sample != raw else { return [] }
+
+        // How long the signal held the value it is now leaving. This is the quantity the
+        // debounce is actually about: a real phase is one the body held still for.
+        let heldFor = t - lastRawChange
+        raw = sample
+        lastRawChange = t
 
         // The first reading establishes the baseline. If the session starts with the
         // sensor already covered the user is mid-descent, so adopt the state without
         // counting anything.
-        guard let last = lastTransition else {
-            isNear = sample
+        guard let phaseSince = lastPhaseChange else {
             phase = sample ? .down : .up
-            lastTransition = t
+            lastPhaseChange = t
             return [.phase(phase, at: t)]
         }
 
-        let elapsed = t - last
-        guard elapsed >= timing.minPhase else { return [] }
+        guard heldFor >= timing.minPhase else { return [] }
 
-        isNear = sample
+        // An accepted edge that agrees with the phase we already believe is a bounce that
+        // happened to be slow. Nothing changed, so nothing is emitted and the phase clock
+        // keeps running.
+        let next: RepPhase = sample ? .down : .up
+        guard next != phase else { return [] }
 
-        if sample {
-            phase = .down
-            lastTransition = t
-            return [.phase(.down, at: t)]
-        }
+        let phaseDuration = t - phaseSince
+        phase = next
+        lastPhaseChange = t
+
+        if next == .down { return [.phase(.down, at: t)] }
 
         // Coming up. Whether that scores depends on how long the descent lasted.
-        phase = .up
-        lastTransition = t
-        guard elapsed <= timing.maxDescent else {
+        guard phaseDuration <= timing.maxDescent else {
             return [.abandoned(at: t), .phase(.up, at: t)]
         }
         count += 1
@@ -102,8 +120,9 @@ public struct ProximityRepMachine: Sendable {
     public mutating func reset() {
         phase = .up
         count = 0
-        lastTransition = nil
-        isNear = false
+        raw = nil
+        lastRawChange = 0
+        lastPhaseChange = nil
     }
 }
 

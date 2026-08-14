@@ -63,6 +63,52 @@ struct ProximityRepMachineTests {
         #expect(repCount(run(trace)) == 0)
     }
 
+    @Test("Sustained chatter never ratchets its way into a rep")
+    func longChatterNeverScores() {
+        // The regression. Measuring the debounce from the last *accepted* transition let
+        // 20 ms flicker accumulate: no single edge cleared 180 ms, but the gap from the
+        // first one kept growing, so the machine accepted an edge every 180 ms and scored
+        // a rep each time. Ten seconds of noise produced dozens of push-ups.
+        var trace: [(TimeInterval, Bool)] = []
+        var t = 0.0
+        for i in 0..<500 {
+            trace.append((t, i.isMultiple(of: 2)))
+            t += 0.02
+        }
+        #expect(repCount(run(trace)) == 0)
+    }
+
+    @Test("Chatter at every interval below the floor stays silent")
+    func chatterAtEveryFastInterval() {
+        for interval in [0.005, 0.02, 0.05, 0.1, 0.17] {
+            var trace: [(TimeInterval, Bool)] = []
+            var t = 0.0
+            for i in 0..<200 {
+                trace.append((t, i.isMultiple(of: 2)))
+                t += interval
+            }
+            #expect(repCount(run(trace)) == 0, "chatter at \(interval)s scored a rep")
+        }
+    }
+
+    @Test("A real set after a burst of chatter still counts every rep")
+    func chatterThenRealRepsStillCounts() {
+        // Rejecting noise must not leave the machine wedged. The sensor settling down is
+        // the normal case after a phone is put on the floor.
+        var trace: [(TimeInterval, Bool)] = []
+        var t = 0.0
+        for i in 0..<40 {
+            trace.append((t, i.isMultiple(of: 2)))
+            t += 0.02
+        }
+        t += 1.0
+        for _ in 0..<3 {
+            trace.append((t, true)); t += 0.6
+            trace.append((t, false)); t += 0.6
+        }
+        #expect(repCount(run(trace)) == 3)
+    }
+
     @Test("Chatter around a real rep does not inflate it")
     func chatterAroundARealRepCountsOnce() {
         let outputs = run([
