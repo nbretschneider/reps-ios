@@ -26,11 +26,18 @@ final class PurchaseStore {
     private(set) var isLoading = false
     private(set) var lastError: String?
 
-    /// `nonisolated` only so `deinit` can cancel it. A `deinit` on a main-actor class
-    /// cannot touch isolated state, and leaking the listener for the app's lifetime is the
-    /// alternative. Plain `nonisolated` rather than `nonisolated(unsafe)`, because `Task`
-    /// is already `Sendable` and the unsafe escape hatch buys nothing.
-    private nonisolated var updatesTask: Task<Void, Never>?
+    /// `@ObservationIgnored` because nothing renders this, and an observable write on every
+    /// assignment would invalidate views for no reason.
+    ///
+    /// Nothing cancels it, and that is deliberate twice over. `@Observable` rewrites every
+    /// stored property through `@ObservationTracked`, and `nonisolated` cannot be applied
+    /// to the mutable backing property the macro generates — so the isolation a `deinit`
+    /// would need does not typecheck at all. It also would not buy anything: `PurchaseStore`
+    /// is created once in `RepsApp` and lives for the whole process, and
+    /// `Transaction.updates` is meant to be listened to for exactly that long. A listener
+    /// that stops early is how a purchase completed during launch goes unnoticed until the
+    /// next cold start.
+    @ObservationIgnored private var updatesTask: Task<Void, Never>?
 
     func start() async {
         // The listener has to be running before the first entitlement check, or a
@@ -47,8 +54,6 @@ final class PurchaseStore {
         await refreshEntitlements()
         await loadProducts()
     }
-
-    deinit { updatesTask?.cancel() }
 
     func loadProducts() async {
         isLoading = true
