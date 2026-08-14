@@ -4,8 +4,9 @@ import Foundation
 /// functions of `PlanState` in `PlanEngine` — nothing is materialized, so a schedule can
 /// never drift out of sync with the state that produced it.
 public enum PlanKind: String, Codable, Hashable, Sendable {
-    /// Five sets scaled off the user's measured max, stepping up as sessions complete and
-    /// deloading after two failures. The default, and the thing worth paying for.
+    /// Scaled off the user's measured max, stepping up as sessions complete and deloading
+    /// after two failures. The default. How many sets it splits into is `setCount`, and
+    /// that defaults to one.
     case adaptive
     /// A published table, reproduced literally. No scaling — the point of following a
     /// named program is following it.
