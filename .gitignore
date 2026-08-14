@@ -25,3 +25,6 @@ Package.resolved
 # Python tooling
 __pycache__/
 *.pyc
+
+# Rendered marketing frames — regenerate with AppStore/marketing/build_frames.py
+AppStore/marketing/out/
