@@ -1,0 +1,146 @@
+name: Reps
+
+# The app group is declared once here and mirrored in RepsKit/Persistence/AppGroup.swift.
+# scripts/preflight.sh greps both and fails if they drift.
+appGroup: &appGroup group.com.gradedays.reps
+
+options:
+  bundleIdPrefix: com.gradedays
+  deploymentTarget:
+    # 18.0 for ControlWidget (Control Center / Action Button).
+    iOS: "18.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+attributes:
+  ORGANIZATIONNAME: Niklas Bretschneider
+
+settings:
+  base:
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: "5LE585TBY9"
+    SWIFT_VERSION: "6.0"
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: "1.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    SUPPORTS_MACCATALYST: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+packages:
+  RepsKit:
+    path: RepsKit
+
+targets:
+  Reps:
+    type: application
+    platform: iOS
+    sources:
+      - path: Reps
+        # Wired explicitly below instead, so it lands in the resources build phase.
+        # An extension is not covered by its host app's manifest, so both targets
+        # carry their own copy of the same file.
+        excludes: ["Resources/PrivacyInfo.xcprivacy"]
+      - path: Reps/Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: RepsKit
+      - target: RepsWidget
+    entitlements:
+      path: Reps/Reps.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - *appGroup
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.gradedays.reps
+        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleDefault
+    info:
+      path: Reps/Info.plist
+      properties:
+        CFBundleDisplayName: Reps
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # An asset-catalog color matching Color.rBackground in both appearances.
+        # Info.plist cannot reference Swift, so the value is duplicated in
+        # Assets.xcassets/LaunchBackground.colorset — keep them in sync or dark mode
+        # flashes white on launch.
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        # Precision mode only. The front camera is used for ARKit face-distance
+        # tracking; no image is recorded, displayed, or leaves the device.
+        NSCameraUsageDescription: >-
+          Precision mode uses the front camera's depth sensor to measure how far you lower
+          on each push-up. Nothing is recorded and no image ever leaves your iPhone.
+        NSHealthUpdateUsageDescription: >-
+          Reps can save each push-up session to Apple Health as a workout so it counts
+          toward your activity rings.
+        NSHealthShareUsageDescription: >-
+          Reps reads push-up workouts you logged elsewhere so your totals stay complete.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.gradedays.reps
+            CFBundleURLSchemes: [reps]
+        ITSAppUsesNonExemptEncryption: false
+
+  RepsWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: RepsWidget
+      # App Intents must be compiled into the extension for Button(intent:) to run
+      # in-process, and the widget needs the design tokens without duplicating them.
+      - path: Reps/Intents
+      - path: Reps/DesignSystem/Theme.swift
+      - path: Reps/Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: RepsKit
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    entitlements:
+      path: RepsWidget/RepsWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - *appGroup
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.gradedays.reps.widget
+    info:
+      path: RepsWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Reps
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
+  RepsTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: RepsTests
+    dependencies:
+      - target: Reps
+      - package: RepsKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.gradedays.reps.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Reps:
+    build:
+      targets:
+        Reps: all
+        RepsWidget: all
+        RepsTests: [test]
+    test:
+      targets: [RepsTests]
+      gatherCoverageData: false
+    run:
+      config: Debug
+    archive:
+      config: Release

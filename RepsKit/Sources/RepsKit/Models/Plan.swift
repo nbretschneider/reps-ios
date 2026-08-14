@@ -1,0 +1,126 @@
+import Foundation
+
+/// How a plan decides what today's sets are. One generator per case, all of them pure
+/// functions of `PlanState` in `PlanEngine` — nothing is materialized, so a schedule can
+/// never drift out of sync with the state that produced it.
+public enum PlanKind: String, Codable, Hashable, Sendable {
+    /// Five sets scaled off the user's measured max, stepping up as sessions complete and
+    /// deloading after two failures. The default, and the thing worth paying for.
+    case adaptive
+    /// A published table, reproduced literally. No scaling — the point of following a
+    /// named program is following it.
+    case table
+    /// A pyramid: 1, 2, 3 ... n ... 3, 2, 1. `n` grows one rung per completed session.
+    case pyramid
+    /// No prescribed sets at all — one number to reach per day, split however you like.
+    case dailyGoal
+}
+
+/// A plan the user can choose. Templates are data, not code: adding one is adding a row.
+public struct PlanTemplate: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var name: String
+    /// One line, shown under the name in the picker.
+    public var summary: String
+    public var kind: PlanKind
+    /// Sessions in one block. For `.dailyGoal` this is unused.
+    public var sessionsPerBlock: Int
+    /// How many days a week the plan trains, used only to describe it in the picker.
+    public var sessionsPerWeek: Int
+    public var isPro: Bool
+
+    public init(
+        id: String,
+        name: String,
+        summary: String,
+        kind: PlanKind,
+        sessionsPerBlock: Int,
+        sessionsPerWeek: Int,
+        isPro: Bool
+    ) {
+        self.id = id
+        self.name = name
+        self.summary = summary
+        self.kind = kind
+        self.sessionsPerBlock = sessionsPerBlock
+        self.sessionsPerWeek = sessionsPerWeek
+        self.isPro = isPro
+    }
+}
+
+/// Where the user currently is inside their chosen plan.
+///
+/// This is the only mutable plan data. Everything a session needs is derived from it by
+/// `PlanEngine`, so a plan can be recomputed from scratch at any time and there is no
+/// materialized schedule to fall out of sync with reality.
+public struct PlanState: Codable, Hashable, Sendable {
+    public var planID: String
+    /// Best single set from the most recent max test. The anchor every adaptive
+    /// prescription scales off.
+    public var baseMax: Int
+    /// Completed sessions inside the current block, `0..<sessionsPerBlock`.
+    public var sessionIndex: Int
+    /// Blocks finished. Shown as "Plan 3" and used to know when to re-test.
+    public var blockIndex: Int
+    /// Sessions failed back to back. Two triggers a deload; completing one resets it.
+    public var consecutiveFailures: Int
+    /// `Calendar` weekday numbers, 1 = Sunday ... 7 = Saturday.
+    public var trainingWeekdays: Set<Int>
+    /// Day key the current block started on.
+    public var startedOn: String
+    /// Only meaningful for `.dailyGoal`.
+    public var dailyGoal: Int
+
+    public init(
+        planID: String,
+        baseMax: Int,
+        sessionIndex: Int = 0,
+        blockIndex: Int = 0,
+        consecutiveFailures: Int = 0,
+        trainingWeekdays: Set<Int> = [2, 4, 6],   // Mon / Wed / Fri
+        startedOn: String,
+        dailyGoal: Int = 100
+    ) {
+        self.planID = planID
+        self.baseMax = baseMax
+        self.sessionIndex = sessionIndex
+        self.blockIndex = blockIndex
+        self.consecutiveFailures = consecutiveFailures
+        self.trainingWeekdays = trainingWeekdays
+        self.startedOn = startedOn
+        self.dailyGoal = dailyGoal
+    }
+}
+
+/// A session the plan says to do on a given day.
+public struct ScheduledSession: Hashable, Sendable {
+    public var dayKey: String
+    public var date: Date
+    public var sets: [Int]
+    public var sessionIndex: Int
+
+    public init(dayKey: String, date: Date, sets: [Int], sessionIndex: Int) {
+        self.dayKey = dayKey
+        self.date = date
+        self.sets = sets
+        self.sessionIndex = sessionIndex
+    }
+
+    public var total: Int { sets.reduce(0, +) }
+}
+
+/// A max test: as many push-ups as possible in one unbroken set. The number the whole
+/// adaptive plan hangs off.
+public struct MaxTest: Codable, Hashable, Sendable, Identifiable {
+    public var id: UUID
+    public var reps: Int
+    public var takenAt: Date
+    public var dayKey: String
+
+    public init(id: UUID = UUID(), reps: Int, takenAt: Date, dayKey: String) {
+        self.id = id
+        self.reps = reps
+        self.takenAt = takenAt
+        self.dayKey = dayKey
+    }
+}
