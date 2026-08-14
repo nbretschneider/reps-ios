@@ -130,6 +130,12 @@ targets:
     dependencies:
       - target: Reps
       - package: RepsKit
+        # RepsKit is a *static* library and the host app already links it, so linking it
+        # again here would put two copies of every symbol in the test process. Xcode
+        # rejects that outright ("linked as a static library by 'RepsTests' and 'Reps'").
+        # Keeping the dependency but not the link leaves `import RepsKit` resolvable in
+        # the test sources while the symbols come from the host app at runtime.
+        link: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.gradedays.reps.tests
