@@ -11,8 +11,13 @@ the HTML recreations, which were only ever a stand-in for a build that could not
 ## Taking them
 
 Use the **iPhone 17 Pro Max** simulator. 6.9" (440x956pt, 1320x2868px) is the required
-slot size and the canvas these frames are authored at; the 6.3" iPhone 17 Pro is a
-different aspect and the script will refuse it rather than stretch it.
+slot size and the canvas these frames are authored at, so a capture from it is composited
+at native resolution with no resampling.
+
+A 6.3" capture is not refused — every recent portrait iPhone is within a rounding error of
+the same aspect — but it is 1206px wide and gets upscaled, so the script warns. What it
+does refuse is anything that is not a full screen: a window shot with chrome in it, a crop,
+a landscape frame.
 
 Fill the app with history first: **Settings ▸ Debug ▸ Fill with demo data** (debug builds
 only). A fresh install screenshots as a wall of zeros.

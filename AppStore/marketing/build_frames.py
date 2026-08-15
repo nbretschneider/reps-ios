@@ -539,11 +539,20 @@ def load_captures(directory: pathlib.Path) -> dict[str, Image.Image]:
     """Real simulator captures, matched to frames by leading number.
 
     Name the files anything starting with the frame number: `01.png`,
-    `02-train.png`, `03 whatever.PNG`. Take them in the simulator with ⌘S. Aspect must be
-    the device's (any iPhone screenshot is); anything else is refused rather than
-    stretched, because a stretched screenshot is exactly what guideline 2.3.3 is about.
+    `02-train.png`, `03 whatever.PNG`. Take them in the simulator with ⌘S.
+
+    The aspect check is deliberately loose, at 0.01. Every recent portrait iPhone lands
+    within 0.001 of the 6.9" canvas — the 6.3" is 0.4600 against 0.4603 — so tightening it
+    would reject captures that composite perfectly. What it is actually for is a capture
+    that is not a full screen at all: a window shot with chrome in it, a crop, a landscape
+    frame. Those are refused rather than stretched to fit, because a stretched screenshot
+    is exactly what guideline 2.3.3 is about.
+
+    A capture narrower than the 6.9" slot still works and is only softer, so that is a
+    warning, not a refusal.
     """
     expected = CANVAS_W / CANVAS_H
+    native_width = SLOTS["6.9"][0]
     captures: dict[str, Image.Image] = {}
     for name, _, _, _ in FRAMES:
         number = name.split("-")[0]
@@ -559,6 +568,11 @@ def load_captures(directory: pathlib.Path) -> dict[str, Image.Image]:
             raise SystemExit(
                 f"{matches[0].name} is {image.width}x{image.height} "
                 f"(aspect {aspect:.3f}, expected {expected:.3f}) — not a full-screen portrait capture"
+            )
+        if image.width < native_width:
+            print(
+                f"  warning: {matches[0].name} is {image.width}px wide, upscaled to "
+                f"{native_width}px — capture on the iPhone 17 Pro Max for a sharp frame"
             )
         captures[name] = image
     return captures
