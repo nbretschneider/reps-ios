@@ -3,6 +3,16 @@
 *.xcodeproj/
 *.xcworkspace/
 
+# Info.plists and entitlements are generated too — project.yml declares them under
+# `info:` and `entitlements:` with the properties inline, so these files are output, not
+# source. Committing them would also fight the build bump, which edits project.yml.
+# Untracked artifacts are not free: preflight.sh refuses to run on a dirty tree, and
+# `git status --porcelain` counts untracked files as dirty.
+Reps/Info.plist
+Reps/Reps.entitlements
+RepsWidget/Info.plist
+RepsWidget/RepsWidget.entitlements
+
 # Build products
 build/
 DerivedData/
