@@ -287,13 +287,13 @@ struct MonthGrid: View {
                         ZStack {
                             Circle().stroke(Color.rMuted, lineWidth: 3)
                             Circle()
-                                .trim(from: 0, to: point.isRest ? 0 : min(1, ringFraction(point)))
+                                .trim(from: 0, to: isBlank(point) ? 0 : min(1, ringFraction(point)))
                                 .stroke(
                                     point.hitGoal ? Color.rAccent : Color.rPrimary,
                                     style: StrokeStyle(lineWidth: 3, lineCap: .round)
                                 )
                                 .rotationEffect(.degrees(-90))
-                            if point.isRest, point.reps == 0 {
+                            if isBlank(point) {
                                 Text("–")
                                     .font(RTheme.caption)
                                     .foregroundStyle(Color.rMutedForeground)
@@ -310,6 +310,21 @@ struct MonthGrid: View {
             }
         }
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+    }
+
+    /// A day with nothing to say yet: one the plan never asked for, or one that has not
+    /// happened.
+    ///
+    /// A future day must not render as `0`. A zero is a judgement, and half a month of
+    /// them makes a perfect record look like a wall of missed days — which is exactly what
+    /// the streak rule already refuses to do ("today does not break a streak until it is
+    /// over"). Both cases get the same dash on purpose: a day you have not reached and a
+    /// day you were never asked to train should read the same, because neither is a miss.
+    ///
+    /// Day keys are `"yyyy-MM-dd"`, so `>` is chronological. Inert for a past month, and
+    /// blanks a future one entirely.
+    private func isBlank(_ point: DayPoint) -> Bool {
+        point.dayKey > today || (point.isRest && point.reps == 0)
     }
 
     /// With no explicit goal there is nothing to be a fraction *of*, so the ring fills

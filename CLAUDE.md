@@ -153,6 +153,21 @@ the whole reason they are stored.
 **Today does not break a streak until it is over.** Opening the app at 9am must not show a
 zero it will not deserve until midnight.
 
+The same rule applies to anything that renders a day: **a day that has not happened is not
+a zero.** `MonthGrid` draws future days with the same dash it gives prescribed rest days,
+because neither is a miss. Rendering them as `0` made a perfect record look like a wall of
+missed days for the back half of every month — the streak rule, broken by the calendar
+sitting next to it.
+
+The streak and the grid also have to agree on what a rest day *is*, or the calendar prints
+four grey zeros a week beside a streak that is deliberately ignoring those same days. Both
+go through `RepsStore.restDays(from:through:)`.
+
+The month **average** deliberately does not, and reads `state.restDays` alone. Judging a
+day and measuring a rate are different questions: a day the plan never asked for is not a
+failure, but it is still a day that elapsed, and "avg a day" under a heading counting a
+calendar month has to mean per calendar day or the label is a lie.
+
 ## Conventions
 
 - Features live under `Reps/Features/<Area>/`. Child components are pure — they take values

@@ -10,13 +10,14 @@ this is the only way to see the design, and the values are exact HSL copies.
 
 Outputs to AppStore/marketing/out/{6.9,6.5}/NN-name.png.
 
-Requires: Pillow, and the Chromium at CHROME (Playwright's copy).
+Requires: Pillow, and a Chromium-family browser (see CHROME_CANDIDATES).
 """
 
 from __future__ import annotations
 
 import base64
 import colorsys
+import os
 import pathlib
 import shutil
 import subprocess
@@ -29,7 +30,45 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 OUT = ROOT / "AppStore" / "marketing" / "out"
 FONT_DIR = ROOT / "AppStore" / "marketing" / "fonts"
 
-CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
+# Any Chromium will do — this only ever renders self-contained HTML with an inlined font.
+# Both platforms are listed because the two halves of this job happen in different places:
+# the frames get authored on Linux, and the real captures get composited on the Mac that
+# ran the simulator. A hardcoded path works exactly once, on whichever machine wrote it.
+CHROME_CANDIDATES = [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/google-chrome",
+]
+
+
+def find_chrome() -> str:
+    """First browser that exists, with $CHROME winning outright.
+
+    Raises rather than returning None, and names everything it tried: a "not found"
+    that lists nothing leaves you guessing at which path it wanted.
+    """
+    override = os.environ.get("CHROME")
+    if override:
+        if not pathlib.Path(override).exists():
+            raise SystemExit(f"$CHROME is set to {override}, which does not exist")
+        return override
+    for candidate in CHROME_CANDIDATES:
+        if pathlib.Path(candidate).exists():
+            return candidate
+    tried = "\n  ".join(CHROME_CANDIDATES)
+    raise SystemExit(
+        "no Chromium-family browser found. Tried:\n  " + tried
+        + "\n\nInstall one, or point at it: CHROME=/path/to/chrome python3 "
+        + "AppStore/marketing/build_frames.py"
+    )
+
+
+CHROME = ""   # resolved in main(), so importing this module never probes the filesystem
 
 # SwiftUI points. Everything below is authored at this width and scaled at the end.
 CANVAS_W, CANVAS_H = 440, 956
@@ -579,8 +618,9 @@ def load_captures(directory: pathlib.Path) -> dict[str, Image.Image]:
 
 
 def main() -> None:
-    if not pathlib.Path(CHROME).exists():
-        raise SystemExit(f"Chromium not found at {CHROME}")
+    global CHROME
+    CHROME = find_chrome()
+    print(f"chrome: {CHROME}")
     if DEVICE_Y + DEVICE_H > CANVAS_H:
         raise SystemExit("the device slot does not fit under the caption band")
 

@@ -189,18 +189,27 @@ final class RepsStore {
         Stats.streak(trainedDays: trainedDays, restDays: streakRestDays, today: today, calendar: calendar)
     }
 
-    /// Days the user marked as rest, **plus every day the plan never asked for**.
+    /// Days the user marked as rest, **plus every day the plan never asked for**, across an
+    /// arbitrary range.
     ///
     /// Without the second half, a three-days-a-week plan breaks its own streak every
-    /// Tuesday and a perfectly compliant user never sees a number above one. Bounded to a
-    /// year of lookback because that is far past any streak worth rendering.
-    private var streakRestDays: Set<String> {
-        guard let plan = state.plan,
-              let start = DayKey.adding(-400, to: today, calendar: calendar)
-        else { return state.restDays }
+    /// Tuesday and a perfectly compliant user never sees a number above one — and the month
+    /// grid draws four grey zeros a week next to it, which says the same wrong thing in
+    /// pictures. Both readers go through here so they cannot drift apart.
+    func restDays(from start: String, through end: String) -> Set<String> {
+        guard let plan = state.plan else { return state.restDays }
         return state.restDays.union(
-            PlanEngine.prescribedRestDays(for: plan, from: start, through: today, calendar: calendar)
+            PlanEngine.prescribedRestDays(for: plan, from: start, through: end, calendar: calendar)
         )
+    }
+
+    /// The streak's view of rest. Bounded to a year of lookback, which is far past any
+    /// streak worth rendering, and unlike the grid it never needs to look forward.
+    private var streakRestDays: Set<String> {
+        guard let start = DayKey.adding(-400, to: today, calendar: calendar) else {
+            return state.restDays
+        }
+        return restDays(from: start, through: today)
     }
 
     /// Today's target: the prescribed session if there is one, otherwise the daily goal.
@@ -270,7 +279,7 @@ final class RepsStore {
         return Stats.series(
             state.workouts, from: start, through: end,
             goal: { _ in dailyGoal },
-            restDays: state.restDays, calendar: calendar
+            restDays: restDays(from: start, through: end), calendar: calendar
         )
     }
 
