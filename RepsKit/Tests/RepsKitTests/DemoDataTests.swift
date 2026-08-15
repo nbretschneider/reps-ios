@@ -24,7 +24,7 @@ struct DemoDataTests {
     @Test("Every screen has something to show")
     func populated() {
         let state = demo()
-        #expect(state.hasCompletedOnboarding)
+        #expect(!state.isFirstRun)
         #expect(state.plan?.planID == PlanCatalog.adaptiveID)
         #expect(state.workouts.count > 80)
         #expect(state.maxTests.count >= 3)
