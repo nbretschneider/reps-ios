@@ -194,7 +194,7 @@ requires the pair.
 | Product | ID | Type | Price | Trial |
 |---|---|---|---|---|
 | Reps Pro (Annual) | `com.gradedays.reps.pro.annual` | Auto-renewable | $9.99/yr | 7 days free |
-| Reps Pro (Monthly) | `com.gradedays.reps.pro.monthly` | Auto-renewable | $1.99/mo | 7 days free |
+| Reps Pro (Monthly) | `com.gradedays.reps.pro.monthly.v2` | Auto-renewable | $1.99/mo | 7 days free |
 | Reps Pro (Lifetime) | `com.gradedays.reps.pro.lifetime` | Non-consumable | $19.99 | n/a |
 
 Subscription group: `Reps Pro`. Annual is the default selection on the paywall.
@@ -236,6 +236,12 @@ year that is the difference between keeping $6.99 and keeping $8.49 per subscrib
 
 **3. Create the products.** IDs must match `PurchaseStore.productIDs` **exactly**, character
 for character — a typo does not error anywhere, it just silently produces no products.
+
+> **Never delete a product to rename it.** App Store Connect retires a product ID the
+> moment it is created and never releases it, even for a product deleted seconds later and
+> never submitted. Reference names, display names and prices are all editable in place;
+> deleting is the one action that cannot be undone. This is why the monthly ID carries a
+> `.v2` suffix.
 
 - Subscription group **`Reps Pro`** first, then the annual and monthly subscriptions inside
   it. Being in one group is what lets someone switch between them and what stops them

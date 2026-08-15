@@ -51,8 +51,8 @@ step "StoreKit product IDs"
 # A product ID that drifts between Swift and the StoreKit config does not error anywhere.
 # The paywall just shows "Pricing is unavailable", which is the most common way a first
 # StoreKit release goes wrong.
-SWIFT_IDS="$(grep -Eo 'com\.gradedays\.reps\.pro\.[a-z]+' Reps/Stores/PurchaseStore.swift | sort -u)"
-CONFIG_IDS="$(grep -Eo 'com\.gradedays\.reps\.pro\.[a-z]+' Reps.storekit | sort -u)"
+SWIFT_IDS="$(grep -Eo 'com\.gradedays\.reps\.pro\.[a-z0-9.]+' Reps/Stores/PurchaseStore.swift | sort -u)"
+CONFIG_IDS="$(grep -Eo 'com\.gradedays\.reps\.pro\.[a-z0-9.]+' Reps.storekit | sort -u)"
 [[ -n "$SWIFT_IDS" ]] || fail "no product IDs found in PurchaseStore.swift"
 if [[ "$SWIFT_IDS" != "$CONFIG_IDS" ]]; then
     printf 'Swift:\n%s\n\nReps.storekit:\n%s\n' "$SWIFT_IDS" "$CONFIG_IDS" >&2

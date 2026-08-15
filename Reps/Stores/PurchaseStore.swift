@@ -15,8 +15,15 @@ import SwiftUI
 @MainActor
 @Observable
 final class PurchaseStore {
+    // App Store Connect **permanently retires a product ID once it has been created**,
+    // even if the product is deleted seconds later and never submitted. `…pro.monthly` was
+    // burned that way, so the live one carries a suffix. Product IDs are never shown to a
+    // customer — only the display name is — so this costs nothing but the asymmetry.
+    //
+    // The lesson, for whoever sets up the next app: fix a wrong name by editing it. Never
+    // delete and recreate.
     static let annualID = "com.gradedays.reps.pro.annual"
-    static let monthlyID = "com.gradedays.reps.pro.monthly"
+    static let monthlyID = "com.gradedays.reps.pro.monthly.v2"
     static let lifetimeID = "com.gradedays.reps.pro.lifetime"
 
     static let productIDs = [annualID, monthlyID, lifetimeID]

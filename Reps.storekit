@@ -138,7 +138,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.gradedays.reps.pro.monthly",
+          "productID" : "com.gradedays.reps.pro.monthly.v2",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Reps Pro Monthly",
           "subscriptionGroupID" : "21B7C093",
