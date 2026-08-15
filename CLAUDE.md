@@ -254,3 +254,9 @@ the build number. Then commit the bump and, in Xcode, Product ▸ Archive ▸ Di
 
 **Shipping HealthKit needs more than the entitlement**: enable the HealthKit capability on
 the App ID in the developer portal, or signing fails.
+
+**The app is portrait-only and must say `UIRequiresFullScreen`.** Without it the upload is
+rejected with error 90474 demanding all four orientations "to support iPad multitasking",
+and `TARGETED_DEVICE_FAMILY: "1"` does not exempt you. Xcode only *warns* at build time, so
+the first real signal is a rejected upload after a full archive. Preflight's bundle
+inspection now fails on it instead.

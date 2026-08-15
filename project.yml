@@ -70,6 +70,15 @@ targets:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # Portrait only, and the App Store validator will not accept that on its own:
+        # upload fails with error 90474 demanding all four orientations "to support iPad
+        # multitasking", even though TARGETED_DEVICE_FAMILY is already 1. Declaring the app
+        # full-screen is what answers the question. Xcode only warns about this at build
+        # time, so it does not surface until the upload is rejected.
+        #
+        # True in substance, not just to satisfy the check: the phone lies flat on the
+        # floor under your chest, and rotating or half-screening that is meaningless.
+        UIRequiresFullScreen: true
         # Precision mode only. The front camera is used for ARKit face-distance
         # tracking; no image is recorded, displayed, or leaves the device.
         NSCameraUsageDescription: >-

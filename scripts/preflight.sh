@@ -106,6 +106,19 @@ if [[ "$SKIP_RELEASE" -eq 0 ]]; then
     [[ -n "$APPEX" ]] || fail "widget extension was not embedded"
     [[ -f "$APPEX/PrivacyInfo.xcprivacy" ]] || fail "widget extension is missing PrivacyInfo.xcprivacy"
     [[ -f "$APP/Assets.car" ]] || fail "asset catalog was not compiled into the bundle"
+
+    # A portrait-only app must declare UIRequiresFullScreen or the upload is rejected with
+    # error 90474, demanding all four orientations "to support iPad multitasking" — even
+    # with TARGETED_DEVICE_FAMILY set to iPhone. Xcode only *warns* at build time, so
+    # without this check the first sign of trouble is a failed upload after a full archive.
+    ORIENTATIONS="$(/usr/libexec/PlistBuddy -c 'Print :UISupportedInterfaceOrientations' \
+        "$APP/Info.plist" 2>/dev/null | grep -c UIInterfaceOrientation || true)"
+    FULLSCREEN="$(/usr/libexec/PlistBuddy -c 'Print :UIRequiresFullScreen' \
+        "$APP/Info.plist" 2>/dev/null || echo "false")"
+    if [[ "$ORIENTATIONS" -lt 4 && "$FULLSCREEN" != "true" ]]; then
+        fail "portrait-only bundle without UIRequiresFullScreen; the upload will be rejected (90474)"
+    fi
+
     echo "bundle looks right: $(basename "$APP") + $(basename "$APPEX")"
 else
     step "Release build (skipped)"
