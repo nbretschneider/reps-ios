@@ -16,14 +16,26 @@ import RepsKit
 /// optional polish.
 @MainActor
 final class ProximityRepDetector: RepDetector {
+    /// Cached after the first probe, and **never re-probed**.
+    ///
+    /// The probe has to switch monitoring on to see whether iOS keeps it on, which means
+    /// reading this property mutates the hardware. That was a real bug: `RepDetectorFactory
+    /// .make` reads it on the way to constructing the detector, so starting a set ran
+    /// enable → disable → enable within a few microseconds, and SwiftUI re-evaluating the
+    /// engine picker could disable monitoring underneath a live set. A getter with a side
+    /// effect on shared hardware is a trap however carefully it restores state.
+    ///
+    /// Every iPhone has the sensor, so the answer never changes within a process.
+    private static var cachedAvailability: Bool?
+
     static var isAvailable: Bool {
-        // The only honest test is to switch it on and see whether iOS keeps it on. A
-        // device with no sensor silently refuses.
+        if let cachedAvailability { return cachedAvailability }
         let device = UIDevice.current
         let wasEnabled = device.isProximityMonitoringEnabled
         device.isProximityMonitoringEnabled = true
         let supported = device.isProximityMonitoringEnabled
-        device.isProximityMonitoringEnabled = wasEnabled
+        if !wasEnabled { device.isProximityMonitoringEnabled = false }
+        cachedAvailability = supported
         return supported
     }
 

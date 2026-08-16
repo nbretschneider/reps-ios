@@ -72,11 +72,17 @@ struct PlacementSheet: View {
                     .font(.system(size: 44))
                     .foregroundStyle(Color.rPrimary)
                     .rotationEffect(.degrees(90))
-                Text("Phone flat on the floor, screen up, under your chest")
+                // The sensor is a few millimetres wide at the *top* of the screen, beside
+                // the front camera, and it only reads covered under about 5 cm. "Under
+                // your chest" is not precise enough: it puts the middle of the phone under
+                // the sternum and the sensor itself under the collarbone, which never gets
+                // low enough. The top of the phone has to point at your feet so the sensor
+                // sits under the part of you that actually reaches the floor.
+                Text("Phone flat on the floor, screen up, top of the phone pointing at your feet")
                     .font(RTheme.bodyMedium)
                     .foregroundStyle(Color.rForeground)
                     .multilineTextAlignment(.center)
-                Text("Lower until your chest is just above it, then push back up.")
+                Text("The sensor is the small window at the top of the screen. Put that directly under your sternum, and lower until your chest brushes it.")
                     .font(RTheme.caption)
                     .foregroundStyle(Color.rMutedForeground)
                     .multilineTextAlignment(.center)

@@ -92,6 +92,9 @@ struct SettingsView: View {
                 }
             }
             Toggle("Haptics", isOn: hapticsBinding)
+            NavigationLink { SensorCheckView() } label: {
+                Label("Sensor check", systemImage: "dot.radiowaves.up.forward")
+            }
         } header: {
             Text("Counting")
         } footer: {
