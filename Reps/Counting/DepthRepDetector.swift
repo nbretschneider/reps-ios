@@ -1,5 +1,6 @@
 import Foundation
 import ARKit
+import AVFoundation
 import RepsKit
 
 /// Precision mode: TrueDepth face tracking, no camera preview rendered.
@@ -41,6 +42,16 @@ final class DepthRepDetector: NSObject, RepDetector, ARSessionDelegate {
 
     func start() throws {
         guard Self.isAvailable else { throw DetectorError.unavailable(.depth) }
+
+        // Without this, a denied camera permission looks exactly like a broken app:
+        // `session.run` succeeds, no frame ever arrives, and the set counts zero with no
+        // error anywhere. Throwing hands the session its fallback and a message to show.
+        // `.notDetermined` is deliberately allowed through — ARKit raises the system
+        // prompt itself, and the countdown is long enough to answer it.
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .denied, .restricted: throw DetectorError.cameraDenied
+        default: break
+        }
         machine = DepthRepMachine()
         count = 0
         startedAt = ProcessInfo.processInfo.systemUptime

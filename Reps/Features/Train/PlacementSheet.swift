@@ -96,7 +96,9 @@ struct PlacementSheet: View {
             SectionHeader(icon: "sensor", title: "Counting")
             HStack(spacing: RTheme.Spacing.inline) {
                 ForEach(available, id: \.self) { option in
-                    let locked = option == .depth && !purchases.isPro
+                    // No engine is gated. Counting is the app; charging for the one engine
+                    // that counts reliably would put the paywall in front of the product.
+                    let locked = false
                     Button {
                         if locked {
                             dismiss()

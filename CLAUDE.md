@@ -42,8 +42,23 @@ synthetic traces.
 
 | Engine | Signal | Notes |
 |---|---|---|
-| `ProximityRepDetector` | `UIDevice.proximityState` | Default. Binary, ~2–5 cm, no permission, no battery cost, works in the dark. |
-| `DepthRepDetector` | ARKit face transform | Pro. Screen stays on, scores depth per rep, needs Face ID hardware. |
+| `DepthRepDetector` | ARKit face transform | **Default.** Measures the descent from 20–60 cm, which is the range a push-up happens in. Screen stays on, scores depth per rep. Needs Face ID hardware and a camera permission. |
+| `ProximityRepDetector` | `UIDevice.proximityState` | Fallback. No permission, no battery cost, works in the dark — but see below. |
+| `ManualRepDetector` | taps | Always available. The fallback when nothing else can run. |
+
+**Proximity was the default until it was tested on a device, and it counted nothing.** The
+sensor reads covered only under about 5 cm (and needs >10 cm to read clear again — it has
+hysteresis), and its window is at the *top* of the phone beside the front camera, not the
+middle. At the bottom of a real push-up the chest is commonly 5–15 cm off the floor and the
+lowest point is the sternum, which sits over the middle of the phone. So the one part of
+the phone that can sense anything is under the part of the chest that never gets low
+enough. It is kept as an engine because it genuinely works if the user puts the top of the
+phone under their sternum and touches it each rep, which `PlacementSheet` now says, but it
+is too demanding a form cue to be the default.
+
+`SensorCheckView` (Settings ▸ Counting ▸ Sensor check) shows raw proximity transitions with
+no rep machine in between, and ticks haptically because iOS blanks the display the instant
+the sensor reads covered. Reach for it before theorising about why counting failed.
 | `ManualRepDetector` | taps | Always available. The fallback when a case hoods the sensor. |
 
 Rules both machines follow:
@@ -200,8 +215,14 @@ analytics, and no network code anywhere else in the app.
 
 Free forever: counting on every engine, unlimited free sets, **the adaptive plan** (at any
 set count), the daily-goal plan, the streak, and the last 30 days of stats. Pro: the
-published programs, full history and charts, Precision mode, widgets, Health sync, CSV
+published programs, full history and charts, depth history, widgets, Health sync, CSV
 export.
+
+"Counting on every engine" was always the stated rule, but `PlacementSheet` gated the depth
+engine behind Pro anyway, and the doc lost. Now that depth is the engine that actually
+counts, that gate would have been a paywall in front of the product, so it is gone. What
+Pro sells on top of depth counting is the *history* of the depth scores, not the ability to
+measure them.
 
 The adaptive plan is free on purpose. It is the daily loop, and a subscription in front of
 the daily loop gates the habit the subscription depends on. The set-count control is never

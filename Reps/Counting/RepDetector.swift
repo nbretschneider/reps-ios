@@ -41,9 +41,12 @@ struct RepEvent {
 enum DetectorError: LocalizedError {
     case unavailable(CountingEngine)
     case calibrationFailed
+    case cameraDenied
 
     var errorDescription: String? {
         switch self {
+        case .cameraDenied:
+            "Camera access is off, so depth counting cannot run. Turn it on in Settings, or switch the engine to Sensor or Tap."
         case .unavailable(let engine):
             switch engine {
             case .proximity: "This iPhone's proximity sensor is not reporting."

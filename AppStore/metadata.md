@@ -102,11 +102,14 @@ NO SOCIAL FEATURES
 No leaderboards. No friend requests. No bot rival doing 600 push-ups a day. The only
 person in this app is you.
 
-PRECISION MODE
+IT SCORES YOUR DEPTH
 
-On iPhones with Face ID, Reps can use the depth camera instead. The screen stays on and
-every rep gets a real depth score, so a set of shallow reps looks different from a set of
-full ones. Nothing is recorded and no image ever leaves your iPhone.
+On iPhones with Face ID, the depth camera measures how far you actually lower on every
+rep, so a set of shallow reps looks different from a set of full ones. Nothing is recorded,
+nothing is shown, and no image ever leaves your iPhone.
+
+No Face ID, or want the screen off? The proximity sensor counts too. Put the top of the
+phone under your sternum and touch it at the bottom of each rep.
 
 EVERYTHING STAYS ON YOUR IPHONE
 
@@ -119,8 +122,8 @@ FREE FOREVER
 Rep counting, your adaptive plan, free sets, the daily goal, your streak and the last 30
 days of history are free and always will be.
 
-Reps Pro adds the published programs, your full history and charts, Precision mode,
-widgets, Apple Health, and export.
+Reps Pro adds the published programs, your full history and charts, every rep's depth score
+kept over time, widgets, Apple Health, and export.
 ```
 
 ---
@@ -268,14 +271,18 @@ the paywall works in the simulator against fake products. See CLAUDE.md.
 ## Review notes
 
 ```
-Reps counts push-ups using the iPhone's proximity sensor. To test it in the simulator,
-choose "Tap" as the counting engine on the setup screen that appears after pressing START
-TRAINING; each tap on the screen registers one rep. The proximity sensor and Precision
-mode both need a physical device.
+Reps counts push-ups with the phone on the floor. By default it uses TrueDepth face
+tracking to measure how far the user lowers; the front camera is used only for distance,
+no image is recorded, shown, or transmitted.
 
-Expected behaviour on a device: the screen turns off while the sensor is covered. That is
-iOS's normal proximity behaviour, not a crash. The app speaks the count so the user does
-not need to see the screen.
+To test in the simulator, choose "Tap" as the counting engine on the setup screen that
+appears after pressing START TRAINING; each tap registers one rep. Face tracking and the
+proximity sensor both need a physical device.
+
+If you switch the engine to "Sensor" on a device, expect the screen to turn off while the
+proximity sensor is covered. That is iOS's normal proximity behaviour, not a crash, and
+the app speaks the count so the screen is not needed. Settings > Counting > Sensor check
+shows the raw sensor state if you want to see it directly.
 
 The app has no account, no server and no network calls other than StoreKit.
 ```

@@ -70,8 +70,16 @@ struct PaywallView: View {
             VStack(alignment: .leading, spacing: RTheme.Spacing.stack) {
                 feature("list.bullet.rectangle", "The classic programs",
                         "100 Push-Ups and the Prison Ladder, reproduced as published.")
-                feature("faceid", "Precision mode",
-                        "The depth camera scores how far you actually lower on every rep.")
+                // Precision mode used to be the headline Pro feature. It is now the free
+                // default, because it is the engine that actually counts reliably and a
+                // paywall in front of the counter is a paywall in front of the app.
+                //
+                // Replaced with export rather than a depth-history claim: the only real
+                // gates in the app are the published programs, the month/year chart
+                // scopes, Health sync and export. Naming anything else would be selling
+                // something that is not behind the wall.
+                feature("square.and.arrow.up", "Export your data",
+                        "Every session as a spreadsheet, whenever you want it.")
                 feature("clock.arrow.circlepath", "Your whole history",
                         "Every month and year, not just the last 30 days.")
                 feature("square.grid.2x2", "Widgets and Health",

@@ -49,7 +49,15 @@ public struct Preferences: Codable, Hashable, Sendable {
     public var bodyWeightKg: Double?
 
     public init(
-        engine: CountingEngine = .proximity,
+        // Depth, not proximity. The proximity sensor only reads covered under about 5 cm
+        // and its window is at the top of the phone, so a chest at the bottom of a real
+        // push-up frequently never trips it. Face tracking measures the same descent from
+        // 20 to 60 cm, which is the range a push-up actually happens in.
+        //
+        // RepsKit cannot ask whether the hardware exists — that would mean importing ARKit
+        // and it is deliberately UIKit-free. `RepDetectorFactory.make` falls back to
+        // proximity and then to tap, so this is a preference, not a promise.
+        engine: CountingEngine = .depth,
         voice: CountingVoice = .everyRep,
         hapticsEnabled: Bool = true,
         restSeconds: Int = 60,
