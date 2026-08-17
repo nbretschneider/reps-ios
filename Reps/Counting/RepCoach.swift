@@ -91,6 +91,13 @@ final class RepCoach {
         say("done. \(total) push-ups.", interrupting: false)
     }
 
+    /// Depth calibration locked on. One word, because the user is holding a plank and
+    /// cannot look, and silence here is the signal that placement needs fixing.
+    func tracking() {
+        guard voice != .silent else { return }
+        say("tracking", interrupting: false)
+    }
+
     /// The machine decided a long hold at the bottom was a rest. Saying so is better than
     /// letting the user wonder why the count stopped.
     func paused() {

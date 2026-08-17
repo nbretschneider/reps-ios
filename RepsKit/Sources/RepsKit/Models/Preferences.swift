@@ -48,6 +48,14 @@ public struct Preferences: Codable, Hashable, Sendable {
     /// Nil means "don't estimate" rather than a default that would be wrong for everyone.
     public var bodyWeightKg: Double?
 
+    /// One-shot migration marker: nil until the app has had the chance to upgrade a
+    /// saved proximity preference to the depth engine (the default changed after device
+    /// testing showed proximity cannot count on iPhone 14 Pro and later). A preference
+    /// saved under the old default would otherwise pin the dead engine forever.
+    /// Optional forever, like every field added after first release — files written
+    /// before it existed must keep decoding, and nil is what triggers the migration.
+    public var engineUpgraded: Bool?
+
     public init(
         // Depth, not proximity. The proximity sensor only reads covered under about 5 cm
         // and its window is at the top of the phone, so a chest at the bottom of a real
@@ -64,7 +72,8 @@ public struct Preferences: Codable, Hashable, Sendable {
         countdownSeconds: Int = 3,
         reminder: ReminderSettings = ReminderSettings(),
         syncToHealth: Bool = false,
-        bodyWeightKg: Double? = nil
+        bodyWeightKg: Double? = nil,
+        engineUpgraded: Bool? = nil
     ) {
         self.engine = engine
         self.voice = voice
@@ -74,5 +83,6 @@ public struct Preferences: Codable, Hashable, Sendable {
         self.reminder = reminder
         self.syncToHealth = syncToHealth
         self.bodyWeightKg = bodyWeightKg
+        self.engineUpgraded = engineUpgraded
     }
 }

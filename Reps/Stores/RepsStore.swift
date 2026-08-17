@@ -44,6 +44,7 @@ final class RepsStore {
             loaded = try repository.drain(into: loaded)
             state = loaded
             status = .ready
+            upgradeEngineIfNeeded()
             refreshDerived()
         } catch {
             status = .loadFailed(String(describing: error))
@@ -134,6 +135,19 @@ final class RepsStore {
     }
 
     var setCount: Int { state.plan?.setCount ?? PlanState.defaultSetCount }
+
+    /// The engine default changed to depth after device testing showed the proximity
+    /// path cannot count push-ups on iPhone 14 Pro and later. A preference saved under
+    /// the old default pins the dead engine forever, because a persisted value always
+    /// beats a new default. Upgrade exactly once: a user who re-picks Sensor afterwards
+    /// is expressing a choice, and the flag means we never override it again.
+    private func upgradeEngineIfNeeded() {
+        guard state.settings.engineUpgraded != true else { return }
+        update {
+            if $0.engine == .proximity, DepthRepDetector.isAvailable { $0.engine = .depth }
+            $0.engineUpgraded = true
+        }
+    }
 
     func update(_ transform: (inout Preferences) -> Void) {
         var preferences = state.settings

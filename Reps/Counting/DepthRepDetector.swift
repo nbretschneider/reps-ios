@@ -20,6 +20,7 @@ import RepsKit
 /// Nothing is recorded, nothing is displayed, and no image leaves the device: the session
 /// runs without an `ARSCNView`, and only `translation` is read off each frame.
 @MainActor
+@Observable
 final class DepthRepDetector: NSObject, RepDetector, ARSessionDelegate {
     static var isAvailable: Bool { ARFaceTrackingConfiguration.isSupported }
 
@@ -34,6 +35,11 @@ final class DepthRepDetector: NSObject, RepDetector, ARSessionDelegate {
     var onNoFace: (() -> Void)?
 
     private(set) var count = 0
+    /// Live camera-to-face distance in metres, for the session HUD. Nil until the first
+    /// tracked frame. This is the same number `CameraCheckView` shows, surfaced during a
+    /// real set so "not counting" is never a mystery again: a moving number with no reps
+    /// is a machine problem, a missing number is a placement problem.
+    private(set) var liveDistance: Double?
     var averageDepth: Double? { machine.averageDepth }
     let engine: CountingEngine = .depth
 
@@ -154,6 +160,7 @@ final class DepthRepDetector: NSObject, RepDetector, ARSessionDelegate {
 
     private func handle(distance: Double) {
         guard distance.isFinite, distance > 0 else { return }
+        liveDistance = distance
 
         if isCalibrating {
             calibrationSamples.append(distance)

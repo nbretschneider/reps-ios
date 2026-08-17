@@ -93,8 +93,17 @@ Rules both machines follow:
 3. **A descent longer than `maxDescent` (8 s) is a pause, not a rep.** The machine emits
    `.abandoned` and resets to `.up` without counting. A long rest *at the top* is fine and
    must never block the next rep.
-4. `DepthRepMachine` Schmitt-triggers between two fractions of the calibrated top-of-rep
-   distance. One threshold would let a user hovering at the midpoint machine-gun reps.
+4. `DepthRepMachine` Schmitt-triggers between two **absolute travel distances** below the
+   calibrated top-of-rep distance (down = 15 cm below top, up = back within 8 cm of it).
+   One threshold would let a user hovering at the midpoint machine-gun reps. Travel, not
+   fractions of the top: a push-up is a fixed excursion regardless of plank height, and
+   the fractional tuning that shipped first (down at 45% of top) sat 1 cm below a real
+   push-up's bottom and counted nothing on a real device. Fractions punish low planks.
+
+The engine preference migrates once: a saved `.proximity` on depth-capable hardware is
+upgraded to `.depth` at load (`RepsStore.upgradeEngineIfNeeded`, flagged by
+`Preferences.engineUpgraded`), because a value persisted under the old default would pin
+the dead engine forever. After the one upgrade the user's explicit choice always wins.
 
 **iOS blanks the display while the proximity sensor is covered.** That is not a bug to work
 around — the user's chest is on the screen. It does mean audio and haptics are the primary

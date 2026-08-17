@@ -209,6 +209,8 @@ struct DepthRepMachineTests {
         var machine = DepthRepMachine()
         machine.calibrate(top: 0.04)   // user was already down during the countdown
         #expect(machine.topDistance == nil)
+        machine.calibrate(top: 0.20)   // mid-descent, or holding the phone
+        #expect(machine.topDistance == nil)
         machine.calibrate(top: 0.55)
         #expect(machine.topDistance == 0.55)
     }
@@ -229,17 +231,37 @@ struct DepthRepMachineTests {
     @Test("A shallow rep never crosses the down threshold and does not count")
     func shallowRepDoesNotCount() {
         var machine = DepthRepMachine()
-        machine.calibrate(top: 0.60)
-        // Bottoms out at 0.35 m, above the 0.27 m down threshold.
-        for (t, m) in cycle(from: 0, top: 0.60, bottom: 0.35, half: 0.6) {
+        machine.calibrate(top: 0.45)
+        // Bottoms out 9 cm below the top — a head bob, not the 15 cm of travel a rep
+        // requires. The threshold is absolute travel on purpose: the first tuning used a
+        // fraction of the top, which turned real push-ups from a low plank into "shallow".
+        for (t, m) in cycle(from: 0, top: 0.45, bottom: 0.36, half: 0.6) {
             _ = machine.consume(meters: m, at: t)
         }
         #expect(machine.count == 0)
     }
 
+    @Test("A full push-up from a low plank counts")
+    func lowPlankCounts() {
+        // The regression that shipped: a 40 cm top with the face bottoming at 20 cm is a
+        // real push-up measured on a real device, and the old fractional thresholds
+        // (down at 45% of top = 18 cm) sat one centimetre below its bottom and counted
+        // nothing. Travel-based thresholds must count it.
+        var machine = DepthRepMachine()
+        machine.calibrate(top: 0.40)
+        var t = 0.0
+        for _ in 0..<5 {
+            for (ts, m) in cycle(from: t, top: 0.40, bottom: 0.20, half: 0.6) {
+                _ = machine.consume(meters: m, at: ts)
+            }
+            t += 1.3
+        }
+        #expect(machine.count == 5)
+    }
+
     @Test("Hovering in the hysteresis band does not machine-gun reps")
     func hysteresisBandIsQuiet() {
-        // Thresholds for a 0.60 m top: down at 0.27, up at 0.51. This is the failure a
+        // Thresholds for a 0.60 m top: down at 0.45, up at 0.52. This is the failure a
         // single threshold would have — a user shaking at the midpoint scoring a rep per
         // frame. Descend properly, then oscillate inside the band and expect silence.
         var machine = DepthRepMachine()

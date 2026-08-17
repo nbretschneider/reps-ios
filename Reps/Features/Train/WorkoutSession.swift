@@ -49,6 +49,12 @@ final class WorkoutSession {
     var totalTarget: Int { targets.reduce(0, +) }
     var isLastSet: Bool { isFreeSet || setIndex >= targets.count - 1 }
     var engine: CountingEngine { detector?.engine ?? preferences.engine }
+    /// Live face distance in centimetres while the depth engine runs, or nil. The HUD
+    /// shows it in the status pill: it is the difference between "broken" and "move the
+    /// phone left" being diagnosable from the floor.
+    var liveDepthCm: Int? {
+        (detector as? DepthRepDetector)?.liveDistance.map { Int(($0 * 100).rounded()) }
+    }
 
     init(
         targets: [Int],
@@ -80,6 +86,15 @@ final class WorkoutSession {
         detector.onPhase = { [weak self] phase in self?.handlePhase(phase) }
         detector.onPause = { [weak self] in self?.handlePause() }
 
+        // Spoken because the user is in a plank, not looking at the screen: hearing
+        // "tracking" is how they know the camera has them before the first rep. Its
+        // absence is equally load-bearing — silence plus the no-face warning below is
+        // what tells them to fix placement instead of doing ten uncounted push-ups.
+        (detector as? DepthRepDetector)?.onCalibrated = { [weak self] _ in
+            guard let self else { return }
+            if self.preferences.hapticsEnabled { Haptics.select() }
+            self.coach.tracking()
+        }
         (detector as? DepthRepDetector)?.onNoFace = { [weak self] in
             self?.fallBackToManual(
                 message: "Can't see your face. Line the camera up under it, or tap the screen with your nose at the bottom of each rep."

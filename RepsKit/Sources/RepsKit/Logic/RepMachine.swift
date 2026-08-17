@@ -130,21 +130,29 @@ public struct ProximityRepMachine: Sendable {
 ///
 /// Unlike the proximity sensor there is no natural threshold here, so the machine
 /// calibrates against the distance measured while the user holds the top of a rep during
-/// the "get ready" countdown, then Schmitt-triggers between two fractions of it. Two
+/// the "get ready" countdown, then Schmitt-triggers between two distances below it. Two
 /// thresholds rather than one is what stops a user hovering near the midpoint from
 /// machine-gunning phantom reps.
+///
+/// The thresholds are absolute travel below the top, not fractions of it. A push-up is a
+/// fixed excursion — elbow flexion moves the body 15 to 30 cm no matter how tall the
+/// plank is — but a fraction scales with the plank. The first tuning shipped as
+/// `downRatio: 0.45`, which from a 40 cm top demanded descending below 18 cm: a full
+/// push-up measured on a real device bottoms out around 20, so the machine sat one
+/// centimetre above every rep and counted nothing. Fractions punish exactly the users
+/// with the lowest planks, which is to say the people doing the best push-ups.
 public struct DepthRepMachine: Sendable {
     public struct Config: Hashable, Sendable {
-        /// Fraction of the calibrated top distance that counts as "down".
-        public var downRatio: Double
-        /// Fraction that counts as back "up". Must exceed `downRatio` — the gap is the
-        /// hysteresis band.
-        public var upRatio: Double
+        /// Metres the face must descend below the calibrated top to count as "down".
+        public var downTravel: Double
+        /// Metres below the top that still counts as back "up". Must be smaller than
+        /// `downTravel` — the difference is the hysteresis band.
+        public var upTravel: Double
         public var timing: RepTiming
 
-        public init(downRatio: Double = 0.45, upRatio: Double = 0.85, timing: RepTiming = .default) {
-            self.downRatio = downRatio
-            self.upRatio = upRatio
+        public init(downTravel: Double = 0.15, upTravel: Double = 0.08, timing: RepTiming = .default) {
+            self.downTravel = downTravel
+            self.upTravel = upTravel
             self.timing = timing
         }
 
@@ -170,10 +178,11 @@ public struct DepthRepMachine: Sendable {
     /// during the countdown; a median rather than a mean because ARKit's first few frames
     /// after a config change are routinely garbage.
     public mutating func calibrate(top: Double) {
-        // A face closer than 10 cm at the top means the user was already down when the
-        // countdown ran. Refuse rather than calibrate to a value that makes every rep a
-        // no-op, and let the caller fall back to proximity.
-        topDistance = top >= 0.10 ? top : nil
+        // A top closer than 25 cm is not a top: the user was mid-descent, or holding the
+        // phone. It would also put the down threshold inside the TrueDepth camera's
+        // minimum range, where tracking drops out anyway. Refusing keeps the detector's
+        // rolling auto-calibration collecting until a real top shows up.
+        topDistance = top >= 0.25 ? top : nil
     }
 
     /// Median helper so callers do not each reimplement it. Returns nil for an empty input.
@@ -187,8 +196,8 @@ public struct DepthRepMachine: Sendable {
     public mutating func consume(meters: Double, at t: TimeInterval) -> [RepOutput] {
         guard let top = topDistance, meters.isFinite, meters > 0 else { return [] }
 
-        let downThreshold = top * config.downRatio
-        let upThreshold = top * config.upRatio
+        let downThreshold = top - config.downTravel
+        let upThreshold = top - config.upTravel
 
         switch phase {
         case .up where meters <= downThreshold:

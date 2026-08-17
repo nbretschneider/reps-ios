@@ -133,7 +133,18 @@ struct SessionView: View {
             if !session.isFreeSet {
                 Label("\(session.totalTarget)", systemImage: "target")
             }
-            Label(session.engine.label, systemImage: session.engine.systemImage)
+            // Depth mode shows the live distance where the engine name would go — the
+            // same number as the camera check, during the set that depends on it. A
+            // moving number that is not counting is a bug report; a missing number says
+            // to move the phone. Every other engine has nothing to show, so it names
+            // itself as before.
+            if session.engine == .depth {
+                Label(session.liveDepthCm.map { "\($0) cm" } ?? "no face", systemImage: "faceid")
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+            } else {
+                Label(session.engine.label, systemImage: session.engine.systemImage)
+            }
         }
         .font(RTheme.captionMedium)
         .foregroundStyle(RTheme.onSession)
