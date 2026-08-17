@@ -128,31 +128,40 @@ public struct ProximityRepMachine: Sendable {
 
 /// Turns a stream of face distances from TrueDepth into reps, with a depth score per rep.
 ///
-/// Unlike the proximity sensor there is no natural threshold here, so the machine
-/// calibrates against the distance measured while the user holds the top of a rep during
-/// the "get ready" countdown, then Schmitt-triggers between two distances below it. Two
-/// thresholds rather than one is what stops a user hovering near the midpoint from
-/// machine-gunning phantom reps.
+/// **Self-anchoring: there is no calibration.** The machine tracks the top of the rep as
+/// a rolling local maximum and measures every descent against it. Two earlier designs
+/// died on a real device, both from trusting a one-shot anchor:
 ///
-/// The thresholds are absolute travel below the top, not fractions of it. A push-up is a
-/// fixed excursion — elbow flexion moves the body 15 to 30 cm no matter how tall the
-/// plank is — but a fraction scales with the plank. The first tuning shipped as
-/// `downRatio: 0.45`, which from a 40 cm top demanded descending below 18 cm: a full
-/// push-up measured on a real device bottoms out around 20, so the machine sat one
-/// centimetre above every rep and counted nothing. Fractions punish exactly the users
-/// with the lowest planks, which is to say the people doing the best push-ups.
+/// 1. Thresholds as *fractions* of a calibrated top (down at 45%) demanded descending
+///    below 18 cm from a 40 cm plank; a real push-up bottoms out around 20 cm. Fractions
+///    punish low planks, because a push-up is a fixed excursion, not a proportion.
+/// 2. Absolute-travel thresholds fixed the geometry but kept the one-shot calibration,
+///    which sampled during the countdown — while the user was still kneeling over the
+///    phone at 30 cm. Every threshold then hung off a number measured in the one posture
+///    the user never holds again.
+///
+/// A rep is now pure relative motion: descend at least `downTravel` below the local top,
+/// then rise at least `riseTravel` off the bottom. Both legs are required, in order, so a
+/// hover cannot machine-gun: to fake two reps you must genuinely oscillate more than
+/// both distances, which is simply doing push-ups. After each rep the local top re-seats
+/// at the current height and grows from there, so kneeling, standing up between sets,
+/// or drifting forward over the phone all self-correct within one rep.
+///
+/// Samples pass through a five-frame median before they touch the state machine: ARKit
+/// emits isolated garbage frames after configuration changes, and a single 9-metre spike
+/// must not become the local top that makes everything below it a descent.
 public struct DepthRepMachine: Sendable {
     public struct Config: Hashable, Sendable {
-        /// Metres the face must descend below the calibrated top to count as "down".
+        /// Metres of descent below the local top that starts a rep.
         public var downTravel: Double
-        /// Metres below the top that still counts as back "up". Must be smaller than
-        /// `downTravel` — the difference is the hysteresis band.
-        public var upTravel: Double
+        /// Metres of rise off the bottom that completes it. Smaller than `downTravel`;
+        /// together they are the hysteresis that a hover cannot cross.
+        public var riseTravel: Double
         public var timing: RepTiming
 
-        public init(downTravel: Double = 0.15, upTravel: Double = 0.08, timing: RepTiming = .default) {
+        public init(downTravel: Double = 0.15, riseTravel: Double = 0.10, timing: RepTiming = .default) {
             self.downTravel = downTravel
-            self.upTravel = upTravel
+            self.riseTravel = riseTravel
             self.timing = timing
         }
 
@@ -161,73 +170,65 @@ public struct DepthRepMachine: Sendable {
 
     public private(set) var phase: RepPhase = .up
     public private(set) var count: Int = 0
-    /// Top-of-rep distance in metres. Nil until calibrated; samples are ignored until then.
-    public private(set) var topDistance: Double?
+    /// The rolling top-of-rep reference in metres, nil until enough samples have arrived.
+    /// Exposed for diagnostics; nothing outside the machine needs to set it.
+    public private(set) var localTop: Double?
 
     private let config: Config
     private var lastTransition: TimeInterval?
     /// Closest the face came during the current descent, for the depth score.
     private var minSeen: Double = .greatestFiniteMagnitude
     private var depths: [Double] = []
+    /// The last few raw samples, for the median filter.
+    private var window: [Double] = []
 
     public init(config: Config = .default) {
         self.config = config
     }
 
-    /// Set the top-of-rep reference. Called once with the median of the samples collected
-    /// during the countdown; a median rather than a mean because ARKit's first few frames
-    /// after a config change are routinely garbage.
-    public mutating func calibrate(top: Double) {
-        // A top closer than 25 cm is not a top: the user was mid-descent, or holding the
-        // phone. It would also put the down threshold inside the TrueDepth camera's
-        // minimum range, where tracking drops out anyway. Refusing keeps the detector's
-        // rolling auto-calibration collecting until a real top shows up.
-        topDistance = top >= 0.25 ? top : nil
-    }
-
-    /// Median helper so callers do not each reimplement it. Returns nil for an empty input.
-    public static func calibrationValue(from samples: [Double]) -> Double? {
-        guard !samples.isEmpty else { return nil }
-        let sorted = samples.sorted()
-        let mid = sorted.count / 2
-        return sorted.count.isMultiple(of: 2) ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
-    }
-
     public mutating func consume(meters: Double, at t: TimeInterval) -> [RepOutput] {
-        guard let top = topDistance, meters.isFinite, meters > 0 else { return [] }
+        // The plausible band for a face over a phone on the floor. Below 5 cm is inside
+        // the TrueDepth minimum range (tracking has already dropped out), above 2 m is
+        // not someone doing push-ups.
+        guard meters.isFinite, meters > 0.05, meters < 2.0 else { return [] }
 
-        let downThreshold = top - config.downTravel
-        let upThreshold = top - config.upTravel
+        window.append(meters)
+        if window.count > 5 { window.removeFirst() }
+        guard window.count == 5 else { return [] }
+        let s = window.sorted()[2]
 
         switch phase {
-        case .up where meters <= downThreshold:
-            guard allow(t) else { return [] }
+        case .up:
+            if s > (localTop ?? 0) { localTop = s }
+            guard let top = localTop, s <= top - config.downTravel, allow(t) else { return [] }
             phase = .down
             lastTransition = t
-            minSeen = meters
+            minSeen = s
             return [.phase(.down, at: t)]
 
         case .down:
-            minSeen = min(minSeen, meters)
-            guard meters >= upThreshold else { return [] }
+            minSeen = min(minSeen, s)
+            guard s >= minSeen + config.riseTravel else { return [] }
             guard let last = lastTransition, t - last >= config.timing.minPhase else { return [] }
             let elapsed = t - last
             phase = .up
             lastTransition = t
+            let top = localTop ?? s
+            // Re-seat the local top at the current height for both outcomes below: the
+            // `.up` case only ever raises it, so this is the one moment it can come back
+            // down — which is what forgives a top inflated by standing up or kneeling.
+            localTop = s
             guard elapsed <= config.timing.maxDescent else {
                 minSeen = .greatestFiniteMagnitude
                 return [.abandoned(at: t), .phase(.up, at: t)]
             }
             // 0 = never left the top, 1 = touched the phone. Clamped because a face can
-            // dip below the calibration point on a deep rep and depth is a fraction.
+            // dip below the reference on a deep rep and depth is a fraction.
             let depth = min(1, max(0, 1 - (minSeen / top)))
             depths.append(depth)
             minSeen = .greatestFiniteMagnitude
             count += 1
             return [.rep(index: count, at: t, depth: depth), .phase(.up, at: t)]
-
-        default:
-            return []
         }
     }
 
@@ -247,6 +248,7 @@ public struct DepthRepMachine: Sendable {
         lastTransition = nil
         minSeen = .greatestFiniteMagnitude
         depths = []
-        // topDistance survives a reset on purpose: calibration is per session, not per set.
+        // localTop and the median window survive a reset on purpose: the user has not
+        // moved between sets, and re-learning the anchor would eat the first rep.
     }
 }

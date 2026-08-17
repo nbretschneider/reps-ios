@@ -17,6 +17,11 @@ import RepsKit
 /// The phones that can run face tracking are exactly the phones whose proximity sensor
 /// cannot count.
 ///
+/// There is deliberately no calibration step here. `DepthRepMachine` anchors itself to a
+/// rolling local maximum, so this detector is pure plumbing: frames in, reps out. Two
+/// generations of countdown-time calibration died on a real device before that lesson
+/// stuck — see the machine's doc comment for the post-mortem.
+///
 /// Nothing is recorded, nothing is displayed, and no image leaves the device: the session
 /// runs without an `ARSCNView`, and only `translation` is read off each frame.
 @MainActor
@@ -27,10 +32,12 @@ final class DepthRepDetector: NSObject, RepDetector, ARSessionDelegate {
     var onRep: ((RepEvent) -> Void)?
     var onPhase: ((RepPhase) -> Void)?
     var onPause: (() -> Void)?
-    /// Fired when calibration completes, so the countdown screen can say "got it".
-    var onCalibrated: ((Double) -> Void)?
-    /// Fired once if no face has been measured several seconds into the working stage.
-    /// The session swaps to tap counting when this fires — the alternative is a set that
+    /// Fired once, on the first tracked frame. The session speaks it, because the user is
+    /// in a plank and cannot look at the screen: hearing "tracking" is how they know the
+    /// camera has them before the first rep.
+    var onTracking: (() -> Void)?
+    /// Fired once if no face has been measured several seconds after starting. The
+    /// session swaps to tap counting when this fires — the alternative is a set that
     /// silently records zero, which is the single worst thing this app can do.
     var onNoFace: (() -> Void)?
 
@@ -46,11 +53,7 @@ final class DepthRepDetector: NSObject, RepDetector, ARSessionDelegate {
     private let session = ARSession()
     private var machine = DepthRepMachine()
     private var startedAt: TimeInterval = 0
-
-    /// Distances collected while uncalibrated. A median of these becomes the top-of-rep
-    /// reference.
-    private var calibrationSamples: [Double] = []
-    private var isCalibrating = false
+    private var sawFace = false
     private var noFaceWatchdog: Task<Void, Never>?
 
     func start() throws {
@@ -67,6 +70,8 @@ final class DepthRepDetector: NSObject, RepDetector, ARSessionDelegate {
         }
         machine = DepthRepMachine()
         count = 0
+        liveDistance = nil
+        sawFace = false
         startedAt = ProcessInfo.processInfo.systemUptime
 
         let configuration = ARFaceTrackingConfiguration()
@@ -79,67 +84,28 @@ final class DepthRepDetector: NSObject, RepDetector, ARSessionDelegate {
         // `MainActor.assumeIsolated` in the callbacks true rather than a crash.
         session.delegateQueue = .main
         session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+
+        // Ten seconds covers the first-run permission dialog, ARKit's warm-up, and the
+        // countdown, with margin. A face that has not appeared by then is not going to:
+        // the phone is in the wrong place, and the session should say so and offer taps
+        // rather than let the set count zero in silence.
+        noFaceWatchdog = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(10))
+            guard !Task.isCancelled, let self, !self.sawFace else { return }
+            self.onNoFace?()
+        }
     }
 
     func stop() {
         session.pause()
         session.delegate = nil
-        isCalibrating = false
-        calibrationSamples = []
         noFaceWatchdog?.cancel()
         noFaceWatchdog = nil
     }
 
     func resetCount() {
-        machine.reset()   // keeps the calibration: it is per session, not per set
+        machine.reset()   // keeps the machine's anchor: it is per session, not per set
         count = 0
-    }
-
-    // MARK: - Calibration
-
-    /// Start collecting the top-of-rep distance. Called when the "get ready" countdown
-    /// begins, which is the one moment the user is reliably holding the top of a rep.
-    func beginCalibration() {
-        calibrationSamples = []
-        isCalibrating = true
-    }
-
-    /// The countdown is over. Calibrate from what it collected if it collected anything.
-    ///
-    /// This used to throw on failure, and the session swapped engines on the spot. On a
-    /// real device that was a disaster in three acts: the very first run spends the whole
-    /// countdown showing the camera permission dialog, so calibration had zero samples,
-    /// so the set silently ran on the proximity engine — which on iPhone 14 Pro and later
-    /// cannot count push-ups at all. Now an empty calibration is not an error: the machine
-    /// stays uncalibrated, `handle(distance:)` keeps collecting, and the set calibrates
-    /// itself off the first second of face tracking. Only a face that never appears gives
-    /// up, via `onNoFace`, so the session can offer tap counting instead.
-    func finishCalibration() {
-        isCalibrating = false
-        tryCalibrate()
-        guard machine.topDistance == nil else { return }
-        noFaceWatchdog?.cancel()
-        noFaceWatchdog = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(6))
-            guard !Task.isCancelled, let self, self.machine.topDistance == nil else { return }
-            // Samples flowing means a face is being measured and calibration is imminent
-            // (or the user is holding the bottom, which the sliding window resolves the
-            // moment they rise). Giving up is only for a face that never appeared.
-            guard self.calibrationSamples.isEmpty else { return }
-            self.onNoFace?()
-        }
-    }
-
-    private func tryCalibrate() {
-        guard machine.topDistance == nil,
-              let top = DepthRepMachine.calibrationValue(from: calibrationSamples) else { return }
-        machine.calibrate(top: top)
-        if machine.topDistance != nil {
-            noFaceWatchdog?.cancel()
-            noFaceWatchdog = nil
-            calibrationSamples = []
-            onCalibrated?(top)
-        }
     }
 
     // MARK: - ARSessionDelegate
@@ -162,21 +128,11 @@ final class DepthRepDetector: NSObject, RepDetector, ARSessionDelegate {
         guard distance.isFinite, distance > 0 else { return }
         liveDistance = distance
 
-        if isCalibrating {
-            calibrationSamples.append(distance)
-            return
-        }
-
-        // Auto-calibration: the countdown ended without a usable reference, so build one
-        // from live tracking instead. A rolling window of the last second, calibrated off
-        // the median once three quarters of a second has accumulated — the window slides,
-        // so even a user caught mid-descent calibrates as soon as they hold a top.
-        // `calibrate` refuses anything under 10 cm, which is what makes sliding safe.
-        if machine.topDistance == nil {
-            calibrationSamples.append(distance)
-            if calibrationSamples.count > 60 { calibrationSamples.removeFirst() }
-            if calibrationSamples.count >= 45 { tryCalibrate() }
-            return
+        if !sawFace {
+            sawFace = true
+            noFaceWatchdog?.cancel()
+            noFaceWatchdog = nil
+            onTracking?()
         }
 
         let t = ProcessInfo.processInfo.systemUptime - startedAt

@@ -67,13 +67,20 @@ reasons, and the second is fatal on modern hardware:
 The engine is kept for the pre-Dynamic-Island phones where it genuinely works, and because
 placement plus a nose-height sensor is still the only zero-permission automatic count.
 
-Depth calibration is **self-healing, not fail-fast**: if the countdown ends with no usable
-samples (first-run camera permission dialog eats the countdown; user not in plank yet), the
-detector keeps collecting and calibrates from a rolling median of the first stable second
-of face tracking. Only a face that never appears gives up, via `onNoFace` → tap fallback
-with a visible warning. `CameraCheckView` (Settings ▸ Counting ▸ Camera check) is the raw
-probe for this engine, exactly as `SensorCheckView` is for proximity: live distance in cm,
-no rep machine in between.
+**The depth engine has no calibration step, and this is a lesson paid for twice.** Two
+one-shot calibration designs died on a real device: fractional thresholds (down at 45% of
+a calibrated top) demanded descending below a real push-up's bottom, and countdown-time
+calibration measured the user kneeling over the phone at 30 cm and then hung every
+threshold off the one posture they never hold again. `DepthRepMachine` now anchors itself:
+the top of the rep is a rolling local maximum, a rep is descend ≥ 15 cm below it then rise
+≥ 10 cm off the bottom, and the anchor re-seats after every rep, so kneeling, standing up
+between sets, and drift all self-correct within one rep. Anything measured at one moment
+is wrong the next; do not reintroduce an anchor that cannot move. The detector announces
+the first tracked frame (`onTracking` → the coach says "tracking") and gives up through
+`onNoFace` after ten faceless seconds → tap fallback with a visible warning. The session
+HUD shows the live distance in depth mode. `CameraCheckView` (Settings ▸ Counting ▸ Camera
+check) is the raw probe for this engine, exactly as `SensorCheckView` is for proximity:
+live distance in cm, no rep machine in between.
 
 `SensorCheckView` (Settings ▸ Counting ▸ Sensor check) shows raw proximity transitions with
 no rep machine in between, and ticks haptically because iOS blanks the display the instant
@@ -93,12 +100,14 @@ Rules both machines follow:
 3. **A descent longer than `maxDescent` (8 s) is a pause, not a rep.** The machine emits
    `.abandoned` and resets to `.up` without counting. A long rest *at the top* is fine and
    must never block the next rep.
-4. `DepthRepMachine` Schmitt-triggers between two **absolute travel distances** below the
-   calibrated top-of-rep distance (down = 15 cm below top, up = back within 8 cm of it).
-   One threshold would let a user hovering at the midpoint machine-gun reps. Travel, not
-   fractions of the top: a push-up is a fixed excursion regardless of plank height, and
-   the fractional tuning that shipped first (down at 45% of top) sat 1 cm below a real
-   push-up's bottom and counted nothing on a real device. Fractions punish low planks.
+4. `DepthRepMachine` requires both legs of a rep in order: descend at least 15 cm below
+   the rolling local top, then rise at least 10 cm off the bottom. Two distances rather
+   than one threshold is what stops a hover from machine-gunning reps, and every wobble
+   deepens the bottom the rise is measured from. Absolute travel, never fractions of the
+   top: a push-up is a fixed excursion regardless of plank height, and the fractional
+   tuning that shipped first sat 1 cm below a real push-up's bottom and counted nothing.
+   Samples pass a five-frame median first, so an isolated garbage frame from ARKit can
+   never become the local top.
 
 The engine preference migrates once: a saved `.proximity` on depth-capable hardware is
 upgraded to `.depth` at load (`RepsStore.upgradeEngineIfNeeded`, flagged by

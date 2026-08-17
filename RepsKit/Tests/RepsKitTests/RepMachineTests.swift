@@ -197,30 +197,46 @@ struct DepthRepMachineTests {
         return samples
     }
 
-    @Test("Uncalibrated samples are ignored entirely")
-    func ignoresUncalibrated() {
-        var machine = DepthRepMachine()
-        #expect(machine.consume(meters: 0.10, at: 0).isEmpty)
-        #expect(machine.count == 0)
+    /// Hold one distance for `frames` samples at 60 Hz.
+    private func hold(from t0: TimeInterval, at meters: Double, frames: Int) -> [(TimeInterval, Double)] {
+        (0..<frames).map { (t0 + Double($0) / 60, meters) }
     }
 
-    @Test("Calibration refuses an implausibly close top-of-rep distance")
-    func refusesBadCalibration() {
+    @Test("Counts with no calibration step at all")
+    func countsWithoutCalibration() {
+        // The whole point of the self-anchoring design: samples in, reps out, nothing to
+        // set up and therefore nothing to set up wrong. Two one-shot calibration designs
+        // died on a real device before this one.
         var machine = DepthRepMachine()
-        machine.calibrate(top: 0.04)   // user was already down during the countdown
-        #expect(machine.topDistance == nil)
-        machine.calibrate(top: 0.20)   // mid-descent, or holding the phone
-        #expect(machine.topDistance == nil)
-        machine.calibrate(top: 0.55)
-        #expect(machine.topDistance == 0.55)
+        for (t, m) in hold(from: 0, at: 0.45, frames: 30) + cycle(from: 0.5, top: 0.45, bottom: 0.20, half: 0.6) {
+            _ = machine.consume(meters: m, at: t)
+        }
+        #expect(machine.count == 1)
+    }
+
+    @Test("A single wild frame cannot become the top")
+    func medianAbsorbsOutliers() {
+        // ARKit emits isolated garbage frames. If one 1.9 m spike became the local top,
+        // the steady plank 1.45 m below it would read as a descent in progress.
+        var machine = DepthRepMachine()
+        var t = 0.0
+        for i in 0..<30 {
+            _ = machine.consume(meters: i == 15 ? 1.9 : 0.45, at: t)
+            t += 1.0 / 60
+        }
+        #expect(machine.phase == .up)
+        #expect(machine.localTop ?? 0 < 0.5)
+        for (ts, m) in cycle(from: t, top: 0.45, bottom: 0.20, half: 0.6) {
+            _ = machine.consume(meters: m, at: ts)
+        }
+        #expect(machine.count == 1)
     }
 
     @Test("A full-depth rep counts and scores near 1")
     func fullDepthScoresHigh() {
         var machine = DepthRepMachine()
-        machine.calibrate(top: 0.60)
         var outputs: [RepOutput] = []
-        for (t, m) in cycle(from: 0, top: 0.60, bottom: 0.05, half: 0.6) {
+        for (t, m) in hold(from: 0, at: 0.60, frames: 30) + cycle(from: 0.5, top: 0.60, bottom: 0.06, half: 0.6) {
             outputs += machine.consume(meters: m, at: t)
         }
         #expect(machine.count == 1)
@@ -231,11 +247,12 @@ struct DepthRepMachineTests {
     @Test("A shallow rep never crosses the down threshold and does not count")
     func shallowRepDoesNotCount() {
         var machine = DepthRepMachine()
-        machine.calibrate(top: 0.45)
         // Bottoms out 9 cm below the top — a head bob, not the 15 cm of travel a rep
         // requires. The threshold is absolute travel on purpose: the first tuning used a
         // fraction of the top, which turned real push-ups from a low plank into "shallow".
-        for (t, m) in cycle(from: 0, top: 0.45, bottom: 0.36, half: 0.6) {
+        var samples = hold(from: 0, at: 0.45, frames: 30)
+        samples += cycle(from: 0.5, top: 0.45, bottom: 0.36, half: 0.6)
+        for (t, m) in samples {
             _ = machine.consume(meters: m, at: t)
         }
         #expect(machine.count == 0)
@@ -244,12 +261,14 @@ struct DepthRepMachineTests {
     @Test("A full push-up from a low plank counts")
     func lowPlankCounts() {
         // The regression that shipped: a 40 cm top with the face bottoming at 20 cm is a
-        // real push-up measured on a real device, and the old fractional thresholds
+        // real push-up measured on a real device, and the first fractional thresholds
         // (down at 45% of top = 18 cm) sat one centimetre below its bottom and counted
         // nothing. Travel-based thresholds must count it.
         var machine = DepthRepMachine()
-        machine.calibrate(top: 0.40)
-        var t = 0.0
+        for (t, m) in hold(from: 0, at: 0.40, frames: 30) {
+            _ = machine.consume(meters: m, at: t)
+        }
+        var t = 0.6
         for _ in 0..<5 {
             for (ts, m) in cycle(from: t, top: 0.40, bottom: 0.20, half: 0.6) {
                 _ = machine.consume(meters: m, at: ts)
@@ -259,82 +278,121 @@ struct DepthRepMachineTests {
         #expect(machine.count == 5)
     }
 
-    @Test("Hovering in the hysteresis band does not machine-gun reps")
-    func hysteresisBandIsQuiet() {
-        // Thresholds for a 0.60 m top: down at 0.45, up at 0.52. This is the failure a
-        // single threshold would have — a user shaking at the midpoint scoring a rep per
-        // frame. Descend properly, then oscillate inside the band and expect silence.
+    @Test("Standing up between sets does not poison the anchor")
+    func standingUpSelfCorrects() {
+        // The scenario that killed one-shot calibration for good: anything measured at
+        // one moment is wrong the next. Stand up (1.2 m), come back to the plank, and
+        // the local top has to find 0.45 again rather than demanding descents measured
+        // from standing height forever.
         var machine = DepthRepMachine()
-        machine.calibrate(top: 0.60)
-        _ = machine.consume(meters: 0.60, at: 0)
-        _ = machine.consume(meters: 0.20, at: 0.4)
-        #expect(machine.phase == .down)
+        var samples = hold(from: 0, at: 0.45, frames: 30)
+        samples += hold(from: 1, at: 1.20, frames: 60)      // standing between sets
+        samples += hold(from: 3, at: 0.45, frames: 60)      // settling back into plank
+        var t = 5.0
+        for _ in 0..<3 {
+            samples += cycle(from: t, top: 0.45, bottom: 0.20, half: 0.6)
+            t += 1.5
+        }
+        for (ts, m) in samples {
+            _ = machine.consume(meters: m, at: ts)
+        }
+        // Settling back down is one descent-and-rise, so at most one extra count; the
+        // three real push-ups must all be there and the machine must end ready for more.
+        #expect(machine.count >= 3)
+        #expect(machine.count <= 4)
+        #expect(machine.phase == .up)
+    }
 
-        var t = 0.5
+    @Test("Hovering near the bottom does not machine-gun reps")
+    func hoverAtBottomIsQuiet() {
+        // The failure a single threshold would have: a user shaking a few centimetres
+        // above their lowest point scoring a rep per wobble. Completing a rep takes a
+        // 10 cm rise off the bottom, and every wobble deepens the bottom the rise is
+        // measured from, so small oscillation can never bank reps.
+        var machine = DepthRepMachine()
+        var samples = hold(from: 0, at: 0.50, frames: 30)
+        samples += cycle(from: 0.5, top: 0.50, bottom: 0.22, half: 0.4).prefix(25)  // descend only
+        var t = 1.0
         for i in 0..<200 {
-            _ = machine.consume(meters: i.isMultiple(of: 2) ? 0.30 : 0.48, at: t)
+            samples.append((t, i.isMultiple(of: 2) ? 0.24 : 0.30))
             t += 1.0 / 60
+        }
+        for (ts, m) in samples {
+            _ = machine.consume(meters: m, at: ts)
         }
         #expect(machine.count == 0)
         #expect(machine.phase == .down)
 
-        // Crossing the upper threshold finally scores it, exactly once.
-        _ = machine.consume(meters: 0.58, at: t)
+        // A genuine rise off the bottom finally scores it, exactly once.
+        for (ts, m) in hold(from: t, at: 0.45, frames: 10) {
+            _ = machine.consume(meters: m, at: ts)
+        }
         #expect(machine.count == 1)
     }
 
     @Test("Ten reps count ten and average depth is reported")
     func countsTenReps() {
         var machine = DepthRepMachine()
-        machine.calibrate(top: 0.60)
-        var t = 0.0
+        for (t, m) in hold(from: 0, at: 0.60, frames: 30) {
+            _ = machine.consume(meters: m, at: t)
+        }
+        var t = 0.6
         for _ in 0..<10 {
             for (ts, m) in cycle(from: t, top: 0.60, bottom: 0.08, half: 0.5) {
                 _ = machine.consume(meters: m, at: ts)
             }
-            t += 1.0
+            t += 1.1
         }
         #expect(machine.count == 10)
         #expect(machine.averageDepth != nil)
         #expect((machine.averageDepth ?? 0) > 0.8)
     }
 
-    @Test("Depth never exceeds 1 even when the face passes the calibration point")
+    @Test("Depth never exceeds 1 even when the face dips below past reps' bottoms")
     func depthIsClamped() {
         var machine = DepthRepMachine()
-        machine.calibrate(top: 0.40)
         var outputs: [RepOutput] = []
-        for (t, m) in cycle(from: 0, top: 0.40, bottom: 0.001, half: 0.5) {
+        var samples = hold(from: 0, at: 0.40, frames: 30)
+        samples += cycle(from: 0.5, top: 0.40, bottom: 0.06, half: 0.5)
+        for (t, m) in samples {
             outputs += machine.consume(meters: m, at: t)
         }
         let depth = outputs.compactMap { if case .rep(_, _, let d) = $0 { return d } else { return nil } }.first
-        #expect((depth ?? 0) <= 1.0)
+        #expect(depth != nil)
+        #expect((depth ?? 2) <= 1.0)
     }
 
-    @Test("Non-finite and negative samples are dropped")
+    @Test("Garbage and out-of-band samples are dropped")
     func rejectsGarbageSamples() {
         var machine = DepthRepMachine()
-        machine.calibrate(top: 0.50)
         #expect(machine.consume(meters: .nan, at: 0).isEmpty)
         #expect(machine.consume(meters: -1, at: 0.1).isEmpty)
         #expect(machine.consume(meters: .infinity, at: 0.2).isEmpty)
+        #expect(machine.consume(meters: 0.01, at: 0.3).isEmpty)   // inside TrueDepth min range
+        #expect(machine.consume(meters: 3.0, at: 0.4).isEmpty)    // nobody planks a metre up
         #expect(machine.count == 0)
+        #expect(machine.localTop == nil)
     }
 
-    @Test("Calibration median ignores ARKit's garbage first frames")
-    func calibrationUsesMedian() {
-        // Two wild outliers among good samples: the median must land on the good ones.
-        let samples = [0.02, 0.55, 0.56, 0.54, 9.9]
-        #expect(DepthRepMachine.calibrationValue(from: samples) == 0.55)
-        #expect(DepthRepMachine.calibrationValue(from: []) == nil)
-    }
-
-    @Test("Calibration survives a reset because it is per session, not per set")
-    func resetKeepsCalibration() {
+    @Test("The anchor survives a reset because it is per session, not per set")
+    func resetKeepsAnchor() {
+        // Between sets the user has not moved; re-learning the top would eat the first
+        // rep of set two. Reset clears the count and the score, nothing else.
         var machine = DepthRepMachine()
-        machine.calibrate(top: 0.50)
+        var samples = hold(from: 0, at: 0.45, frames: 30)
+        samples += cycle(from: 0.5, top: 0.45, bottom: 0.20, half: 0.6)
+        for (t, m) in samples {
+            _ = machine.consume(meters: m, at: t)
+        }
+        #expect(machine.count == 1)
+
         machine.reset()
-        #expect(machine.topDistance == 0.50)
         #expect(machine.count == 0)
+        #expect(machine.localTop != nil)
+
+        for (t, m) in cycle(from: 2.5, top: 0.45, bottom: 0.20, half: 0.6) {
+            _ = machine.consume(meters: m, at: t)
+        }
+        #expect(machine.count == 1)
     }
 }

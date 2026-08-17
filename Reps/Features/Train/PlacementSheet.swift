@@ -110,7 +110,7 @@ struct PlacementSheet: View {
     private var placementDetail: String {
         switch engine {
         case .depth:
-            "The camera should look straight up at you. Hold the top of a push-up during the countdown so it can measure your starting height."
+            "The camera should look straight up at you. It says tracking once it sees your face, and counting is automatic from there."
         case .proximity:
             "The sensor is the small window at the top of the screen. Put that directly under your sternum, and lower until your chest brushes it."
         case .manual:

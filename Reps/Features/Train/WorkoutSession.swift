@@ -90,7 +90,7 @@ final class WorkoutSession {
         // "tracking" is how they know the camera has them before the first rep. Its
         // absence is equally load-bearing — silence plus the no-face warning below is
         // what tells them to fix placement instead of doing ten uncounted push-ups.
-        (detector as? DepthRepDetector)?.onCalibrated = { [weak self] _ in
+        (detector as? DepthRepDetector)?.onTracking = { [weak self] in
             guard let self else { return }
             if self.preferences.hapticsEnabled { Haptics.select() }
             self.coach.tracking()
@@ -106,10 +106,6 @@ final class WorkoutSession {
         } catch {
             fallBackToManual(message: error.localizedDescription)
         }
-
-        // Precision mode calibrates against the top-of-rep distance, and the countdown is
-        // the one moment the user is reliably holding it.
-        (self.detector as? DepthRepDetector)?.beginCalibration()
         runCountdown()
     }
 
@@ -192,9 +188,6 @@ final class WorkoutSession {
     }
 
     private func startWorking() {
-        // An empty calibration is no longer a swap-engines moment: the detector keeps
-        // calibrating itself off live tracking, and only gives up via onNoFace.
-        (detector as? DepthRepDetector)?.finishCalibration()
         coach.countdown(0)
         reps = 0
         setStartedAt = Date()

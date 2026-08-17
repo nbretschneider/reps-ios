@@ -223,11 +223,8 @@ private struct CountdownScreen: View {
                 .kerning(2)
                 .foregroundStyle(RTheme.onSessionDim)
             Spacer()
-            // Precision mode is measuring the top-of-rep distance right now, so the user
-            // has to be holding it. Saying so is the difference between a calibration that
-            // works and one that fails on the first set.
             Text(engine == .depth
-                 ? "Hold the top of a push-up while this counts down"
+                 ? "Get into a plank, face over the phone. It says tracking when it sees you."
                  : "Phone flat on the floor, under your chest")
                 .font(RTheme.body)
                 .foregroundStyle(RTheme.onSessionDim)
