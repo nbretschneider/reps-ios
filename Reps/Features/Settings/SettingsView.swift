@@ -92,6 +92,11 @@ struct SettingsView: View {
                 }
             }
             Toggle("Haptics", isOn: hapticsBinding)
+            if DepthProbe.isSupported {
+                NavigationLink { CameraCheckView() } label: {
+                    Label("Camera check", systemImage: "faceid")
+                }
+            }
             NavigationLink { SensorCheckView() } label: {
                 Label("Sensor check", systemImage: "dot.radiowaves.up.forward")
             }

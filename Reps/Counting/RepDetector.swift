@@ -40,7 +40,6 @@ struct RepEvent {
 
 enum DetectorError: LocalizedError {
     case unavailable(CountingEngine)
-    case calibrationFailed
     case cameraDenied
 
     var errorDescription: String? {
@@ -53,8 +52,6 @@ enum DetectorError: LocalizedError {
             case .depth: "Precision mode needs an iPhone with Face ID."
             case .manual: "Tap counting is unavailable."
             }
-        case .calibrationFailed:
-            "Could not measure your starting distance. Hold the top of a push-up during the countdown."
         }
     }
 }
@@ -97,7 +94,7 @@ extension CountingEngine {
     var explanation: String {
         switch self {
         case .proximity:
-            "Put the phone on the floor under your chest. Lower until your chest is over it, then push. The screen goes dark at the bottom — that is the sensor working."
+            "The top of the phone senses your chest arriving. The screen goes dark at the bottom of a rep, and that is the sensor working. On iPhone 14 Pro and newer, iOS slows this sensor down for apps and it may miss reps. Precision counts better there."
         case .depth:
             "The front camera measures how far you lower on each rep and scores your depth. The screen stays on."
         case .manual:

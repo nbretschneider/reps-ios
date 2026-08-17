@@ -46,20 +46,38 @@ synthetic traces.
 | `ProximityRepDetector` | `UIDevice.proximityState` | Fallback. No permission, no battery cost, works in the dark — but see below. |
 | `ManualRepDetector` | taps | Always available. The fallback when nothing else can run. |
 
-**Proximity was the default until it was tested on a device, and it counted nothing.** The
-sensor reads covered only under about 5 cm (and needs >10 cm to read clear again — it has
-hysteresis), and its window is at the *top* of the phone beside the front camera, not the
-middle. At the bottom of a real push-up the chest is commonly 5–15 cm off the floor and the
-lowest point is the sternum, which sits over the middle of the phone. So the one part of
-the phone that can sense anything is under the part of the chest that never gets low
-enough. It is kept as an engine because it genuinely works if the user puts the top of the
-phone under their sternum and touches it each rep, which `PlacementSheet` now says, but it
-is too demanding a form cue to be the default.
+**Proximity was the default until it was tested on a device, and it counted nothing.** Two
+reasons, and the second is fatal on modern hardware:
+
+1. *Geometry.* The sensor reads covered only under about 5 cm (and needs >10 cm to read
+   clear again — it has hysteresis), and its window is at the *top* of the phone beside the
+   front camera, not the middle. At the bottom of a real push-up the chest is commonly
+   5–15 cm off the floor and the lowest point is the sternum, which sits over the middle of
+   the phone. `PlacementSheet` compensates: top of the phone under the sternum, pointing at
+   the feet.
+2. *Platform.* On iPhone 14 Pro and later the sensor moved under the display, and the
+   version third-party apps get through `UIDevice.proximityState` responds in 3–6 seconds
+   or not at all (Apple's own apps use a faster private path — screen blanking in the Phone
+   app proves nothing about ours). A push-up is 1–2 seconds. On these phones the engine
+   cannot work, no matter the placement, and a raw `SensorCheckView` hand-wave shows zero
+   transitions. This is why **every fallback in `WorkoutSession` goes to manual, never to
+   proximity**: the phones that run the depth engine are exactly the phones whose proximity
+   sensor is throttled, so proximity-as-safety-net was a dead engine catching a live one.
+
+The engine is kept for the pre-Dynamic-Island phones where it genuinely works, and because
+placement plus a nose-height sensor is still the only zero-permission automatic count.
+
+Depth calibration is **self-healing, not fail-fast**: if the countdown ends with no usable
+samples (first-run camera permission dialog eats the countdown; user not in plank yet), the
+detector keeps collecting and calibrates from a rolling median of the first stable second
+of face tracking. Only a face that never appears gives up, via `onNoFace` → tap fallback
+with a visible warning. `CameraCheckView` (Settings ▸ Counting ▸ Camera check) is the raw
+probe for this engine, exactly as `SensorCheckView` is for proximity: live distance in cm,
+no rep machine in between.
 
 `SensorCheckView` (Settings ▸ Counting ▸ Sensor check) shows raw proximity transitions with
 no rep machine in between, and ticks haptically because iOS blanks the display the instant
 the sensor reads covered. Reach for it before theorising about why counting failed.
-| `ManualRepDetector` | taps | Always available. The fallback when a case hoods the sensor. |
 
 Rules both machines follow:
 

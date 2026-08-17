@@ -65,29 +65,56 @@ struct PlacementSheet: View {
         return available.contains(saved) ? saved : (available.first ?? .manual)
     }
 
+    // Placement is per engine, and depth and proximity are opposites: depth needs the
+    // camera under your FACE looking straight up at it, proximity needs the top of the
+    // phone under your STERNUM because only the sensor window can feel anything. One
+    // shared illustration told depth users to aim the camera at their chest, which meant
+    // no face, a failed calibration, and a first set that counted zero.
     private var illustration: some View {
         RCard {
             VStack(spacing: RTheme.Spacing.stack) {
-                Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                Image(systemName: engine == .depth ? "faceid" : "iphone.gen3.radiowaves.left.and.right")
                     .font(.system(size: 44))
                     .foregroundStyle(Color.rPrimary)
-                    .rotationEffect(.degrees(90))
-                // The sensor is a few millimetres wide at the *top* of the screen, beside
-                // the front camera, and it only reads covered under about 5 cm. "Under
-                // your chest" is not precise enough: it puts the middle of the phone under
-                // the sternum and the sensor itself under the collarbone, which never gets
-                // low enough. The top of the phone has to point at your feet so the sensor
-                // sits under the part of you that actually reaches the floor.
-                Text("Phone flat on the floor, screen up, top of the phone pointing at your feet")
+                    .rotationEffect(.degrees(engine == .depth ? 0 : 90))
+                Text(placementHeadline)
                     .font(RTheme.bodyMedium)
                     .foregroundStyle(Color.rForeground)
                     .multilineTextAlignment(.center)
-                Text("The sensor is the small window at the top of the screen. Put that directly under your sternum, and lower until your chest brushes it.")
+                Text(placementDetail)
                     .font(RTheme.caption)
                     .foregroundStyle(Color.rMutedForeground)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var placementHeadline: String {
+        switch engine {
+        case .depth:
+            "Phone flat on the floor, screen up, directly under your face"
+        case .proximity:
+            // The sensor is a few millimetres wide at the *top* of the screen, beside
+            // the front camera, and it only reads covered under about 5 cm. "Under
+            // your chest" is not precise enough: it puts the middle of the phone under
+            // the sternum and the sensor itself under the collarbone, which never gets
+            // low enough. The top of the phone has to point at your feet so the sensor
+            // sits under the part of you that actually reaches the floor.
+            "Phone flat on the floor, screen up, top of the phone pointing at your feet"
+        case .manual:
+            "Phone flat on the floor, under your face"
+        }
+    }
+
+    private var placementDetail: String {
+        switch engine {
+        case .depth:
+            "The camera should look straight up at you. Hold the top of a push-up during the countdown so it can measure your starting height."
+        case .proximity:
+            "The sensor is the small window at the top of the screen. Put that directly under your sternum, and lower until your chest brushes it."
+        case .manual:
+            "Tap the screen with your nose at the bottom of each rep, or count with a finger or a volume button."
         }
     }
 

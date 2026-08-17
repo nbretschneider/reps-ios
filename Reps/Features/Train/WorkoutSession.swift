@@ -80,21 +80,39 @@ final class WorkoutSession {
         detector.onPhase = { [weak self] phase in self?.handlePhase(phase) }
         detector.onPause = { [weak self] in self?.handlePause() }
 
+        (detector as? DepthRepDetector)?.onNoFace = { [weak self] in
+            self?.fallBackToManual(
+                message: "Can't see your face. Line the camera up under it, or tap the screen with your nose at the bottom of each rep."
+            )
+        }
+
         do {
             try detector.start()
         } catch {
-            engineWarning = error.localizedDescription
-            // Fall back rather than strand the user face-down on the floor.
-            let fallback = ManualRepDetector()
-            fallback.onRep = { [weak self] event in self?.handleRep(event) }
-            self.detector = fallback
-            try? fallback.start()
+            fallBackToManual(message: error.localizedDescription)
         }
 
         // Precision mode calibrates against the top-of-rep distance, and the countdown is
         // the one moment the user is reliably holding it.
         (self.detector as? DepthRepDetector)?.beginCalibration()
         runCountdown()
+    }
+
+    /// Swap the live detector for tap counting, keeping whatever was already counted.
+    ///
+    /// Always taps, never the proximity sensor: on iPhone 14 Pro and later iOS throttles
+    /// the proximity sensor for third-party apps so hard it cannot count push-ups, and
+    /// those are exactly the phones that run the depth engine. Falling back to it was how
+    /// a failed calibration became a set that silently recorded zero. The touchscreen has
+    /// no such failure mode, and a nose tap at the bottom of each rep is how the classic
+    /// push-up apps counted for years.
+    private func fallBackToManual(message: String) {
+        engineWarning = message
+        detector?.stop()
+        let fallback = ManualRepDetector()
+        fallback.onRep = { [weak self] event in self?.handleRep(event) }
+        try? fallback.start()
+        detector = fallback
     }
 
     func end() {
@@ -159,22 +177,9 @@ final class WorkoutSession {
     }
 
     private func startWorking() {
-        if let depth = detector as? DepthRepDetector {
-            do {
-                try depth.endCalibration()
-            } catch {
-                // Calibration failed, so Precision mode would count nothing. Swap engines
-                // rather than run a set that silently records zero.
-                engineWarning = error.localizedDescription
-                depth.stop()
-                let fallback = ProximityRepDetector()
-                fallback.onRep = { [weak self] event in self?.handleRep(event) }
-                fallback.onPhase = { [weak self] phase in self?.handlePhase(phase) }
-                fallback.onPause = { [weak self] in self?.handlePause() }
-                try? fallback.start()
-                detector = fallback
-            }
-        }
+        // An empty calibration is no longer a swap-engines moment: the detector keeps
+        // calibrating itself off live tracking, and only gives up via onNoFace.
+        (detector as? DepthRepDetector)?.finishCalibration()
         coach.countdown(0)
         reps = 0
         setStartedAt = Date()

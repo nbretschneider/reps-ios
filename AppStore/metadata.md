@@ -281,8 +281,9 @@ proximity sensor both need a physical device.
 
 If you switch the engine to "Sensor" on a device, expect the screen to turn off while the
 proximity sensor is covered. That is iOS's normal proximity behaviour, not a crash, and
-the app speaks the count so the screen is not needed. Settings > Counting > Sensor check
-shows the raw sensor state if you want to see it directly.
+the app speaks the count so the screen is not needed. Settings > Counting has a Camera
+check and a Sensor check that show each sensor's raw state if you want to see them
+directly.
 
 The app has no account, no server and no network calls other than StoreKit.
 ```
