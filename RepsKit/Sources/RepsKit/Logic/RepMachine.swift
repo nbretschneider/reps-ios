@@ -140,22 +140,33 @@ public struct ProximityRepMachine: Sendable {
 ///    phone at 30 cm. Every threshold then hung off a number measured in the one posture
 ///    the user never holds again.
 ///
-/// A rep is now pure relative motion: descend at least `downTravel` below the local top,
-/// then rise at least `riseTravel` off the bottom. Both legs are required, in order, so a
-/// hover cannot machine-gun: to fake two reps you must genuinely oscillate more than
-/// both distances, which is simply doing push-ups. After each rep the local top re-seats
-/// at the current height and grows from there, so kneeling, standing up between sets,
-/// or drifting forward over the phone all self-correct within one rep.
+/// A rep is pure relative motion, and **it counts at the bottom**: descending
+/// `downTravel` below the local top scores the rep on the spot, and rising off the
+/// bottom re-arms the machine for the next one. Counting at the bottom is a product
+/// decision, not an accident: the voice and haptic land at the moment of effort, which
+/// is where every nose-touch counter has always put them, and it removes a real device
+/// bug — the camera's depth estimate is noisy near its minimum range, so a "count on
+/// the way up" trigger sitting 10 cm above a noisy bottom double-counted sets when the
+/// user held their bottom position. The bottom crossing is measured against the local
+/// top, far from the noise. The trade: a set abandoned at the very bottom keeps that
+/// last rep. The user who descended and collapsed did the hard half; they can have it.
+///
+/// The re-arm rise is half the rep's own descent (clamped between `riseTravel` and
+/// 15 cm), so bottom-range noise cannot re-arm and re-fire: to bank another rep you
+/// must genuinely come up and go back down, which is simply doing push-ups. After each
+/// re-arm the local top re-seats at the current height and grows from there, so
+/// kneeling, standing up between sets, or drifting forward over the phone all
+/// self-correct within one rep.
 ///
 /// Samples pass through a five-frame median before they touch the state machine: ARKit
 /// emits isolated garbage frames after configuration changes, and a single 9-metre spike
 /// must not become the local top that makes everything below it a descent.
 public struct DepthRepMachine: Sendable {
     public struct Config: Hashable, Sendable {
-        /// Metres of descent below the local top that starts a rep.
+        /// Metres of descent below the local top that scores a rep.
         public var downTravel: Double
-        /// Metres of rise off the bottom that completes it. Smaller than `downTravel`;
-        /// together they are the hysteresis that a hover cannot cross.
+        /// Minimum metres of rise off the bottom that re-arms the machine. The actual
+        /// requirement scales to half the rep's own descent, clamped to at most 15 cm.
         public var riseTravel: Double
         public var timing: RepTiming
 
@@ -178,7 +189,13 @@ public struct DepthRepMachine: Sendable {
     private var lastTransition: TimeInterval?
     /// Closest the face came during the current descent, for the depth score.
     private var minSeen: Double = .greatestFiniteMagnitude
+    /// The local top at the moment the current rep counted, so its score cannot be
+    /// changed retroactively by where the user goes next.
+    private var topAtCount: Double = 0
+    private var pauseNotified = false
     private var depths: [Double] = []
+    /// Travel in metres per rep, the tangible twin of the depth fraction.
+    private var travels: [Double] = []
     /// The last few raw samples, for the median filter.
     private var window: [Double] = []
 
@@ -201,40 +218,61 @@ public struct DepthRepMachine: Sendable {
         case .up:
             if s > (localTop ?? 0) { localTop = s }
             guard let top = localTop, s <= top - config.downTravel, allow(t) else { return [] }
+            // The bottom crossing IS the rep. Voice and haptic land here, at the moment
+            // of effort. The score is provisional and deepens as the user keeps going.
             phase = .down
             lastTransition = t
+            topAtCount = top
             minSeen = s
-            return [.phase(.down, at: t)]
+            pauseNotified = false
+            count += 1
+            depths.append(min(1, max(0, 1 - s / top)))
+            travels.append(top - s)
+            return [.phase(.down, at: t), .rep(index: count, at: t, depth: depths[depths.count - 1])]
 
         case .down:
             minSeen = min(minSeen, s)
-            guard s >= minSeen + config.riseTravel else { return [] }
-            guard let last = lastTransition, t - last >= config.timing.minPhase else { return [] }
-            let elapsed = t - last
-            phase = .up
-            lastTransition = t
-            let top = localTop ?? s
-            // Re-seat the local top at the current height for both outcomes below: the
-            // `.up` case only ever raises it, so this is the one moment it can come back
-            // down — which is what forgives a top inflated by standing up or kneeling.
-            localTop = s
-            guard elapsed <= config.timing.maxDescent else {
-                minSeen = .greatestFiniteMagnitude
-                return [.abandoned(at: t), .phase(.up, at: t)]
-            }
             // 0 = never left the top, 1 = touched the phone. Clamped because a face can
-            // dip below the reference on a deep rep and depth is a fraction.
-            let depth = min(1, max(0, 1 - (minSeen / top)))
-            depths.append(depth)
-            minSeen = .greatestFiniteMagnitude
-            count += 1
-            return [.rep(index: count, at: t, depth: depth), .phase(.up, at: t)]
+            // dip below the reference on a deep rep and depth is a fraction. Only ever
+            // deepens: the score is the best of the rep, not where it happened to end.
+            depths[depths.count - 1] = min(1, max(depths[depths.count - 1], 1 - minSeen / topAtCount))
+            travels[travels.count - 1] = max(travels[travels.count - 1], topAtCount - minSeen)
+
+            // Re-arm on a genuine rise: half this rep's descent, at least riseTravel,
+            // never more than 15 cm (so a top inflated by standing up stays escapable).
+            // Depth noise near the camera's minimum range spans centimetres; it cannot
+            // span half a push-up, which is what made count-on-the-way-up double-fire.
+            let requiredRise = max(config.riseTravel, min(0.15, (topAtCount - minSeen) / 2))
+            if s >= minSeen + requiredRise, let last = lastTransition, t - last >= config.timing.minPhase {
+                phase = .up
+                lastTransition = t
+                // Re-seat the anchor at the current height: the `.up` case only ever
+                // raises it, so this is the one moment it can come back down — which is
+                // what forgives a top inflated by standing up or kneeling.
+                localTop = s
+                minSeen = .greatestFiniteMagnitude
+                return [.phase(.up, at: t)]
+            }
+
+            // A long stay at the bottom is a rest, worth saying, but the rep already
+            // counted when they got down there and staying does not un-do it.
+            if !pauseNotified, let last = lastTransition, t - last > config.timing.maxDescent {
+                pauseNotified = true
+                return [.abandoned(at: t)]
+            }
+            return []
         }
     }
 
     /// Mean depth across the set, or nil if no rep completed.
     public var averageDepth: Double? {
         depths.isEmpty ? nil : depths.reduce(0, +) / Double(depths.count)
+    }
+
+    /// Mean travel in metres across the set, or nil if no rep completed. The same
+    /// measurement as the depth fraction, in units a person can picture.
+    public var averageTravel: Double? {
+        travels.isEmpty ? nil : travels.reduce(0, +) / Double(travels.count)
     }
 
     private func allow(_ t: TimeInterval) -> Bool {
@@ -247,7 +285,9 @@ public struct DepthRepMachine: Sendable {
         count = 0
         lastTransition = nil
         minSeen = .greatestFiniteMagnitude
+        pauseNotified = false
         depths = []
+        travels = []
         // localTop and the median window survive a reset on purpose: the user has not
         // moved between sets, and re-learning the anchor would eat the first rep.
     }

@@ -49,7 +49,7 @@ disallowed. Plurals of an indexed singular are matched automatically, but `pushu
 ## Promotional text (170 char limit, editable without a new build)
 
 ```
-One set. Two minutes. Put your iPhone on the floor under your chest and it counts every rep out loud, while your music keeps playing.
+One set. Two minutes. Put your iPhone on the floor under your face and it counts every rep out loud, while your music keeps playing.
 ```
 (139 characters)
 
@@ -58,18 +58,18 @@ One set. Two minutes. Put your iPhone on the floor under your chest and it count
 ## Description
 
 ```
-Put your iPhone on the floor, screen up, under your chest. Lower until your chest is over
-it, then push. That is a rep, and Reps counted it.
+Put your iPhone on the floor, screen up, under your face. Lower toward it, push back up.
+That is a rep, and Reps counted it at the bottom, where the work is.
 
-No watch. No chest strap. No camera pointed at you. The proximity sensor already in your
-iPhone does the whole job, which means it works in a dark room, costs nothing in battery,
-and never asks for a permission.
+No watch. No chest strap. No typing numbers after every set. The same camera that unlocks
+your iPhone measures how far away your face is, sixty times a second. Nothing is recorded,
+nothing is shown, and no image ever leaves your iPhone.
 
 COUNTS OUT LOUD
 
-The screen goes dark at the bottom of every rep, because your chest is on top of it. So
-Reps speaks the count instead. Your music keeps playing underneath, ducking just enough
-that you hear the number and then it comes back.
+You are mid push-up. You are not reading a screen. So Reps speaks every rep as you make
+it, and your music keeps playing underneath, ducking just enough that you hear the number
+before it comes back.
 
 ONE SET, NOT FIFTEEN MINUTES
 
@@ -104,12 +104,12 @@ person in this app is you.
 
 IT SCORES YOUR DEPTH
 
-On iPhones with Face ID, the depth camera measures how far you actually lower on every
-rep, so a set of shallow reps looks different from a set of full ones. Nothing is recorded,
-nothing is shown, and no image ever leaves your iPhone.
+Every rep gets a depth score, in percent and in centimetres, so a set of shallow reps
+looks different from a set of full ones. Not to judge you. So that when you get stronger,
+you can see it.
 
-No Face ID, or want the screen off? The proximity sensor counts too. Put the top of the
-phone under your sternum and touch it at the bottom of each rep.
+No Face ID on your phone? The proximity sensor counts on models that have one, and tap
+counting works everywhere: touch the screen with your nose at the bottom of each rep.
 
 EVERYTHING STAYS ON YOUR IPHONE
 
@@ -119,7 +119,7 @@ exported as a spreadsheet whenever you like.
 
 FREE FOREVER
 
-Rep counting, your adaptive plan, free sets, the daily goal, your streak and the last 30
+Rep counting, your adaptive plan, open sets, the daily goal, your streak and the last 30
 days of history are free and always will be.
 
 Reps Pro adds the published programs, your full history and charts, every rep's depth score

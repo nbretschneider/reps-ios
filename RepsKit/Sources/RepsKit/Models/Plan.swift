@@ -81,7 +81,10 @@ public struct PlanState: Codable, Hashable, Sendable {
         sessionIndex: Int = 0,
         blockIndex: Int = 0,
         consecutiveFailures: Int = 0,
-        trainingWeekdays: Set<Int> = [2, 4, 6],   // Mon / Wed / Fri
+        // Every day. A streak is the retention mechanic, and a three-day default breaks
+        // it four days out of seven for anyone who never finds the schedule editor. The
+        // Plan tab scales it back for people who already know what they want.
+        trainingWeekdays: Set<Int> = [1, 2, 3, 4, 5, 6, 7],
         startedOn: String,
         dailyGoal: Int = 100,
         setCount: Int = PlanState.defaultSetCount

@@ -253,7 +253,7 @@ struct TrainingDaysSheet: View {
                 }
             }
         }
-        .onAppear { selected = store.state.plan?.trainingWeekdays ?? [2, 4, 6] }
+        .onAppear { selected = store.state.plan?.trainingWeekdays ?? [1, 2, 3, 4, 5, 6, 7] }
     }
 
     /// Respect the user's locale: a week that starts on Monday should render that way.

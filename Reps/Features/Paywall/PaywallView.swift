@@ -166,7 +166,7 @@ struct PaywallView: View {
                     .foregroundStyle(Color.rDestructive)
                     .multilineTextAlignment(.center)
             }
-            Text("Counting, your adaptive plan, free sets, your streak and the last 30 days stay free forever. Cancel any time in Settings.")
+            Text("Counting, your adaptive plan, open sets, your streak and the last 30 days stay free forever. Cancel any time in Settings.")
                 .font(RTheme.caption)
                 .foregroundStyle(Color.rMutedForeground)
                 .multilineTextAlignment(.center)

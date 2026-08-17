@@ -86,28 +86,34 @@ live distance in cm, no rep machine in between.
 no rep machine in between, and ticks haptically because iOS blanks the display the instant
 the sensor reads covered. Reach for it before theorising about why counting failed.
 
-Rules both machines follow:
+The machines' rules:
 
-1. **A rep is emitted on the upstroke.** That is how people count out loud, and it means a
-   set abandoned at the bottom scores the reps that finished rather than one phantom extra.
-2. **A phase counts only if the signal held still for `minPhase` (180 ms) before the edge
-   that ends it.** Measure that from the last *raw* change, including rejected ones — not
-   from the last accepted transition. Measuring from the last accepted transition is a bug
-   that shipped once and cost a test: no single 20 ms flicker clears 180 ms, but the gap
-   from the first edge keeps growing, so the machine accepts an edge every 180 ms and
-   scores a rep each time. Sustained chatter ratcheted itself into reps at a steady clip,
-   which is exactly what the debounce exists to prevent.
-3. **A descent longer than `maxDescent` (8 s) is a pause, not a rep.** The machine emits
-   `.abandoned` and resets to `.up` without counting. A long rest *at the top* is fine and
-   must never block the next rep.
-4. `DepthRepMachine` requires both legs of a rep in order: descend at least 15 cm below
-   the rolling local top, then rise at least 10 cm off the bottom. Two distances rather
-   than one threshold is what stops a hover from machine-gunning reps, and every wobble
-   deepens the bottom the rise is measured from. Absolute travel, never fractions of the
-   top: a push-up is a fixed excursion regardless of plank height, and the fractional
+1. **The depth machine counts at the bottom; proximity counts on the upstroke.** Depth
+   counting at the bottom is a product decision (the voice and haptic land at the moment
+   of effort, where every nose-touch counter put them) and a correctness one: counting on
+   a small rise off the bottom double-counted real sets, because the camera's depth
+   estimate is noisy near its minimum range and a 10 cm rise trigger sat inside the
+   noise. The bottom crossing is measured against the local top, far from the noise. The
+   trade, accepted deliberately: a set abandoned at the very bottom keeps that last rep.
+2. **A depth rep is descend ≥ 15 cm below the rolling local top; rising half the descent
+   (clamped to 10–15 cm) re-arms for the next one.** Absolute travel, never fractions of
+   the top: a push-up is a fixed excursion regardless of plank height, and the fractional
    tuning that shipped first sat 1 cm below a real push-up's bottom and counted nothing.
-   Samples pass a five-frame median first, so an isolated garbage frame from ARKit can
-   never become the local top.
+   Samples pass a five-frame median first, so an isolated ARKit garbage frame can never
+   become the local top.
+3. **Proximity: a phase counts only if the signal held still for `minPhase` (180 ms)
+   before the edge that ends it.** Measure that from the last *raw* change, including
+   rejected ones — not from the last accepted transition. Measuring from the last
+   accepted transition is a bug that shipped once and cost a test: no single 20 ms
+   flicker clears 180 ms, but the gap from the first edge keeps growing, so the machine
+   accepts an edge every 180 ms and scores a rep each time. Sustained chatter ratcheted
+   itself into reps at a steady clip, which is exactly what the debounce exists to
+   prevent.
+4. **A stay at the bottom longer than `maxDescent` (8 s) is a pause.** Proximity emits
+   `.abandoned` and resets without counting; depth emits it as a notification and keeps
+   the already-counted rep. A long rest *at the top* is fine and must never block the
+   next rep. In the session, `startWorking` resets the detector's count because settling
+   from kneeling into a plank is a descent, and the machine will have counted it.
 
 The engine preference migrates once: a saved `.proximity` on depth-capable hardware is
 upgraded to `.depth` at load (`RepsStore.upgradeEngineIfNeeded`, flagged by
@@ -191,6 +197,11 @@ count. Falling short repeats the session. **Two consecutive failures deload the 
 and advance anyway** — repeating a session the user cannot do is a dead end. A block is 30
 sessions, after which `needsMaxTest` becomes true.
 
+**Training days default to all seven.** Onboarding used to ask which weekdays and the
+question cost more than it answered: a new user has no basis to choose, and a three-day
+default breaks the streak (the retention mechanic) four days out of seven for anyone who
+never finds the schedule editor. The Plan tab still edits it; onboarding no longer asks.
+
 **A free set does not consume a scheduled session.** Logging twenty push-ups at your desk
 must not tick off the day's prescribed work, which is why `completedPlanDays` filters on
 `planID != nil && isComplete`.
@@ -249,7 +260,8 @@ calendar month has to mean per calendar day or the label is a lie.
 StoreKit 2 in `Reps/Stores/PurchaseStore.swift`. No receipt server, no third-party SDK, no
 analytics, and no network code anywhere else in the app.
 
-Free forever: counting on every engine, unlimited free sets, **the adaptive plan** (at any
+Free forever: counting on every engine, unlimited free sets (labelled "Open set" in the
+UI, because "free" next to a paywall reads as pricing), **the adaptive plan** (at any
 set count), the daily-goal plan, the streak, and the last 30 days of stats. Pro: the
 published programs, full history and charts, depth history, widgets, Health sync, CSV
 export.

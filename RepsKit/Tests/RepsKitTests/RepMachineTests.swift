@@ -235,13 +235,45 @@ struct DepthRepMachineTests {
     @Test("A full-depth rep counts and scores near 1")
     func fullDepthScoresHigh() {
         var machine = DepthRepMachine()
-        var outputs: [RepOutput] = []
         for (t, m) in hold(from: 0, at: 0.60, frames: 30) + cycle(from: 0.5, top: 0.60, bottom: 0.06, half: 0.6) {
-            outputs += machine.consume(meters: m, at: t)
+            _ = machine.consume(meters: m, at: t)
         }
         #expect(machine.count == 1)
-        let depth = outputs.compactMap { if case .rep(_, _, let d) = $0 { return d } else { return nil } }.first
-        #expect((depth ?? 0) > 0.85)
+        // The rep counts at the down crossing with a provisional score, then the score
+        // deepens as the user keeps descending, so the average is where the truth lives.
+        #expect((machine.averageDepth ?? 0) > 0.85)
+        #expect((machine.averageTravel ?? 0) > 0.45)
+    }
+
+    @Test("The rep counts at the bottom, not on the way back up")
+    func countsAtTheBottom() {
+        // Product decision: the voice and haptic land at the moment of effort, exactly
+        // where every nose-touch counter has always put them. It also moves the trigger
+        // away from the camera's noisy minimum range, which double-counted sets when
+        // the count fired on a small rise off a noisy bottom.
+        var machine = DepthRepMachine()
+        var samples = hold(from: 0, at: 0.45, frames: 30)
+        samples += cycle(from: 0.5, top: 0.45, bottom: 0.20, half: 0.6).prefix(25)  // descent only
+        for (t, m) in samples {
+            _ = machine.consume(meters: m, at: t)
+        }
+        #expect(machine.count == 1)
+        #expect(machine.phase == .down)
+    }
+
+    @Test("A long stay at the bottom is a pause and keeps the rep")
+    func bottomRestKeepsTheRep() {
+        var machine = DepthRepMachine()
+        var outputs: [RepOutput] = []
+        var samples = hold(from: 0, at: 0.45, frames: 30)
+        samples += cycle(from: 0.5, top: 0.45, bottom: 0.20, half: 0.6).prefix(25)
+        samples += hold(from: 1.2, at: 0.20, frames: 60 * 9)   // nine seconds at the bottom
+        for (t, m) in samples {
+            outputs += machine.consume(meters: m, at: t)
+        }
+        let paused = outputs.contains { if case .abandoned = $0 { return true } else { return false } }
+        #expect(paused)
+        #expect(machine.count == 1)
     }
 
     @Test("A shallow rep never crosses the down threshold and does not count")
@@ -303,12 +335,13 @@ struct DepthRepMachineTests {
         #expect(machine.phase == .up)
     }
 
-    @Test("Hovering near the bottom does not machine-gun reps")
+    @Test("Wobbling near the bottom cannot bank extra reps")
     func hoverAtBottomIsQuiet() {
-        // The failure a single threshold would have: a user shaking a few centimetres
-        // above their lowest point scoring a rep per wobble. Completing a rep takes a
-        // 10 cm rise off the bottom, and every wobble deepens the bottom the rise is
-        // measured from, so small oscillation can never bank reps.
+        // The regression that shipped as double counting: the camera's depth estimate is
+        // noisy near its minimum range, and a count-on-the-way-up trigger 10 cm above a
+        // noisy bottom fired once for the noise and once for the real ascent. Now the
+        // descent counts exactly once, and re-arming takes half the descent — noise
+        // spans centimetres, not half a push-up.
         var machine = DepthRepMachine()
         var samples = hold(from: 0, at: 0.50, frames: 30)
         samples += cycle(from: 0.5, top: 0.50, bottom: 0.22, half: 0.4).prefix(25)  // descend only
@@ -320,14 +353,15 @@ struct DepthRepMachineTests {
         for (ts, m) in samples {
             _ = machine.consume(meters: m, at: ts)
         }
-        #expect(machine.count == 0)
+        #expect(machine.count == 1)
         #expect(machine.phase == .down)
 
-        // A genuine rise off the bottom finally scores it, exactly once.
+        // A genuine rise re-arms without counting again.
         for (ts, m) in hold(from: t, at: 0.45, frames: 10) {
             _ = machine.consume(meters: m, at: ts)
         }
         #expect(machine.count == 1)
+        #expect(machine.phase == .up)
     }
 
     @Test("Ten reps count ten and average depth is reported")

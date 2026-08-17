@@ -154,6 +154,8 @@ final class WorkoutSession {
     private func handlePhase(_ next: RepPhase) {
         guard case .working = stage else { return }
         phase = next
+        // Rising re-arms the machine, so it also ends any bottom-rest pause banner.
+        if next == .up { isPaused = false }
         if next == .down, preferences.hapticsEnabled { Haptics.descent() }
     }
 
@@ -188,6 +190,9 @@ final class WorkoutSession {
     }
 
     private func startWorking() {
+        // The machine counts at the bottom, and settling from kneeling into a plank is a
+        // descent. Anything it scored during the countdown is setup, not push-ups.
+        detector?.resetCount()
         coach.countdown(0)
         reps = 0
         setStartedAt = Date()
@@ -218,6 +223,7 @@ final class WorkoutSession {
             startedAt: setStartedAt,
             duration: Date().timeIntervalSince(setStartedAt),
             averageDepth: detector?.averageDepth,
+            averageTravel: (detector as? DepthRepDetector)?.averageTravel,
             engine: engine
         )
         completedSets.append(record)
@@ -278,6 +284,7 @@ final class WorkoutSession {
                 startedAt: setStartedAt,
                 duration: Date().timeIntervalSince(setStartedAt),
                 averageDepth: detector?.averageDepth,
+                averageTravel: (detector as? DepthRepDetector)?.averageTravel,
                 engine: engine
             ))
         }

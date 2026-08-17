@@ -48,7 +48,7 @@ struct PlacementSheet: View {
                     .padding(RTheme.Spacing.page)
                     .background(.regularMaterial)
             }
-            .navigationTitle(targets.isEmpty ? "Free set" : "Get set up")
+            .navigationTitle(targets.isEmpty ? "Open set" : "Get set up")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

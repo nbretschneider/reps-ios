@@ -321,8 +321,12 @@ private struct SummaryScreen: View {
                 .padding(.top, RTheme.Spacing.inline)
             }
 
+            // Percent for comparability across sessions, centimetres because a person
+            // can picture 24 cm and cannot picture 82%.
             if let depth = Format.depth(session.completedSets.compactMap(\.averageDepth).average) {
-                Label("Average depth \(depth)", systemImage: "arrow.down.to.line")
+                let travel = session.completedSets.compactMap(\.averageTravel).average
+                    .map { " (\(Int(($0 * 100).rounded())) cm)" } ?? ""
+                Label("Average depth \(depth)\(travel)", systemImage: "arrow.down.to.line")
                     .font(RTheme.caption)
                     .foregroundStyle(RTheme.onSessionDim)
             }

@@ -26,10 +26,14 @@ public struct CompletedSet: Codable, Hashable, Sendable, Identifiable {
     public var duration: TimeInterval
     /// Seconds rested after this set. Zero on the last set of a session.
     public var restAfter: TimeInterval
-    /// Mean rep depth as a fraction of the calibrated top-of-rep distance, 0...1.
+    /// Mean rep depth as a fraction of the top-of-rep distance, 0...1.
     /// Only Precision mode produces this; nil everywhere else. Optional rather than
     /// defaulted to 0, because "not measured" and "no depth" must not read the same.
     public var averageDepth: Double?
+    /// Mean descent per rep in metres — the same measurement as `averageDepth`, in units
+    /// a person can picture. Optional forever: sets recorded before it existed decode
+    /// as nil, and nil must render as nothing, never as 0 cm.
+    public var averageTravel: Double?
     public var engine: CountingEngine
 
     public init(
@@ -40,6 +44,7 @@ public struct CompletedSet: Codable, Hashable, Sendable, Identifiable {
         duration: TimeInterval = 0,
         restAfter: TimeInterval = 0,
         averageDepth: Double? = nil,
+        averageTravel: Double? = nil,
         engine: CountingEngine
     ) {
         self.id = id
@@ -49,6 +54,7 @@ public struct CompletedSet: Codable, Hashable, Sendable, Identifiable {
         self.duration = duration
         self.restAfter = restAfter
         self.averageDepth = averageDepth
+        self.averageTravel = averageTravel
         self.engine = engine
     }
 

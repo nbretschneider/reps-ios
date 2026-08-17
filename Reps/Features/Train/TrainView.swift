@@ -162,7 +162,7 @@ struct TrainView: View {
     private var freeSetCard: some View {
         RCard {
             VStack(alignment: .leading, spacing: RTheme.Spacing.stack) {
-                SectionHeader(icon: "infinity", title: "Free set")
+                SectionHeader(icon: "infinity", title: "Open set")
                 Text("Count push-ups with no target. Counts toward your day either way.")
                     .font(RTheme.body)
                     .foregroundStyle(Color.rMutedForeground)
@@ -171,7 +171,7 @@ struct TrainView: View {
                     placementTargets = []
                     showPlacement = true
                 } label: {
-                    Text("START A FREE SET")
+                    Text("START AN OPEN SET")
                         .font(RTheme.bodyMedium)
                         .foregroundStyle(Color.rPrimary)
                         .frame(maxWidth: .infinity)

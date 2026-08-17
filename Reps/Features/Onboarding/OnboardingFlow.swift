@@ -13,7 +13,6 @@ struct OnboardingFlow: View {
 
     @State private var page = 0
     @State private var maxText = ""
-    @State private var weekdays: Set<Int> = [2, 4, 6]
     @FocusState private var isFieldFocused: Bool
 
     var body: some View {
@@ -25,7 +24,6 @@ struct OnboardingFlow: View {
                     welcome.tag(0)
                     howItWorks.tag(1)
                     maxPage.tag(2)
-                    schedulePage.tag(3)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .always))
 
@@ -58,16 +56,14 @@ struct OnboardingFlow: View {
 
     private var howItWorks: some View {
         page(
-            title: "No wearables, no camera",
-            subtitle: "The proximity sensor already in your iPhone does the counting."
+            title: "No wearables, no typing",
+            subtitle: "The same camera that unlocks your iPhone measures every rep."
         ) {
             VStack(alignment: .leading, spacing: RTheme.Spacing.card) {
-                bullet("iphone.gen3", "Phone flat on the floor, screen up, under your chest.")
-                bullet("arrow.down.to.line", "Lower until your chest is over it. Push back up. That's one.")
+                bullet("iphone.gen3", "Phone flat on the floor, screen up, under your face.")
+                bullet("arrow.down.to.line", "Lower toward it. Every rep is counted and scored for depth.")
                 bullet("speaker.wave.2.fill", "It counts out loud, so you never need to look.")
-                // The single most common "is it broken?" moment. Answering it before the
-                // first set is worth more than any support email.
-                bullet("moon.fill", "The screen goes dark at the bottom of each rep. That's the sensor working.")
+                bullet("lock.shield", "Nothing is recorded and nothing leaves your iPhone.")
             }
             .padding(.horizontal, RTheme.Spacing.page)
         }
@@ -117,40 +113,6 @@ struct OnboardingFlow: View {
         }
     }
 
-    private var schedulePage: some View {
-        page(
-            title: "Which days?",
-            subtitle: "Three a week is enough to make progress and leave room to recover."
-        ) {
-            VStack(spacing: RTheme.Spacing.card) {
-                HStack(spacing: RTheme.Spacing.inline) {
-                    ForEach(orderedWeekdays, id: \.self) { weekday in
-                        Button {
-                            if weekdays.contains(weekday) { weekdays.remove(weekday) } else { weekdays.insert(weekday) }
-                            Haptics.select()
-                        } label: {
-                            Text(symbol(weekday))
-                                .font(RTheme.captionMedium)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, RTheme.Spacing.stack)
-                                .background(
-                                    weekdays.contains(weekday) ? Color.rPrimary : Color.rMuted,
-                                    in: RoundedRectangle(cornerRadius: RTheme.Radius.chip, style: .continuous)
-                                )
-                                .foregroundStyle(weekdays.contains(weekday) ? .white : Color.rMutedForeground)
-                        }
-                        .buttonStyle(.pressable)
-                    }
-                }
-                .padding(.horizontal, RTheme.Spacing.page)
-
-                Text("You can change this any time on the Plan tab.")
-                    .font(RTheme.caption)
-                    .foregroundStyle(Color.rMutedForeground)
-            }
-        }
-    }
-
     // MARK: - Chrome
 
     private func page<Content: View>(
@@ -192,11 +154,11 @@ struct OnboardingFlow: View {
     private var footer: some View {
         VStack(spacing: RTheme.Spacing.inline) {
             PrimaryButton(
-                title: page == 3 ? "START TRAINING" : "CONTINUE",
+                title: page == 2 ? "START TRAINING" : "CONTINUE",
                 isEnabled: page != 2 || parsedMax != nil
             ) {
                 Haptics.tap()
-                if page < 3 {
+                if page < 2 {
                     withAnimation { page += 1 }
                 } else {
                     finish()
@@ -206,7 +168,7 @@ struct OnboardingFlow: View {
             if page == 2 {
                 Button("I don't know yet") {
                     maxText = "10"
-                    withAnimation { page += 1 }
+                    finish()
                 }
                 .font(RTheme.caption)
                 .tint(.rMutedForeground)
@@ -225,25 +187,19 @@ struct OnboardingFlow: View {
     private func finish() {
         let max = parsedMax ?? 10
         store.recordMaxTest(reps: max)
+        // Every day, not a picker. Onboarding used to ask which weekdays, and the
+        // question cost more than it answered: a brand-new user has no idea, three days
+        // a week undercuts the streak (the retention mechanic) four days out of seven,
+        // and the Plan tab can change it any time. Daily is the default that builds the
+        // habit; scaling back is a decision for someone who already has one.
         store.setPlan(PlanState(
             planID: PlanCatalog.adaptiveID,
             baseMax: max,
-            trainingWeekdays: weekdays.isEmpty ? [2, 4, 6] : weekdays,
             startedOn: store.today
         ))
         store.completeOnboarding()
         // The paywall lands after setup, not before it: a user who has already told the
-        // app their max and their days has something to lose by leaving.
+        // app their max has something to lose by leaving.
         router.showPaywall = true
-    }
-
-    private var orderedWeekdays: [Int] {
-        let first = Calendar.current.firstWeekday
-        return (0..<7).map { ((first - 1 + $0) % 7) + 1 }
-    }
-
-    private func symbol(_ weekday: Int) -> String {
-        let symbols = Calendar.current.veryShortWeekdaySymbols
-        return symbols.indices.contains(weekday - 1) ? symbols[weekday - 1] : "?"
     }
 }

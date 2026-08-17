@@ -48,6 +48,8 @@ final class DepthRepDetector: NSObject, RepDetector, ARSessionDelegate {
     /// is a machine problem, a missing number is a placement problem.
     private(set) var liveDistance: Double?
     var averageDepth: Double? { machine.averageDepth }
+    /// Mean descent per rep in metres, the tangible twin of the depth fraction.
+    var averageTravel: Double? { machine.averageTravel }
     let engine: CountingEngine = .depth
 
     private let session = ARSession()
