@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 import RepsKit
 
 struct TrainView: View {
@@ -16,6 +17,11 @@ struct TrainView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: RTheme.Spacing.card) {
                         totals
+                        // The visual anchor of the tab, above the action cards on purpose:
+                        // the number to beat is the motivation, and it is hidden until
+                        // there is at least one rep in the window so a brand-new user's
+                        // first screen is the start button, not an empty chart.
+                        if rangeTotal(days: 13) > 0 { weekCard }
                         todayCard
                         streakCard
                         freeSetCard
@@ -60,6 +66,78 @@ struct TrainView: View {
     }
 
     @ViewBuilder
+    /// The last seven days as bars, under the number that summarizes them.
+    ///
+    /// The hero is the 7-day daily average, because it is the number worth pushing up: a
+    /// single day can be a fluke, the average cannot. Per *calendar* day, same as the
+    /// month average on Profile — an "avg a day" label over any other denominator is a
+    /// lie. The dashed rule draws that average across the bars, so every bar is visibly
+    /// above or below the line to beat. Bars reuse the Profile chart's encoding (goal hit
+    /// = accent, otherwise chart pink) rather than inventing a second grammar, one series
+    /// means no legend, and the y-axis is hidden because the hero number *is* the scale.
+    private var weekCard: some View {
+        RCard {
+            VStack(alignment: .leading, spacing: RTheme.Spacing.stack) {
+                SectionHeader(icon: "chart.bar.fill", title: "Last 7 days")
+
+                HStack(alignment: .firstTextBaseline, spacing: RTheme.Spacing.inline) {
+                    Text("\(weekAverage)")
+                        .font(RTheme.font(size: 40, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.rForeground)
+                    Text("avg a day")
+                        .font(RTheme.caption)
+                        .foregroundStyle(Color.rMutedForeground)
+                    Spacer()
+                    trendChip
+                }
+
+                Chart {
+                    ForEach(weekPoints) { point in
+                        BarMark(
+                            x: .value("Day", point.dayKey),
+                            y: .value("Reps", point.reps)
+                        )
+                        .cornerRadius(3)
+                        .foregroundStyle(point.hitGoal ? Color.rAccent : Color.rChart1)
+                    }
+                    if weekAverageExact > 0 {
+                        RuleMark(y: .value("Average", weekAverageExact))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                            .foregroundStyle(Color.rMutedForeground.opacity(0.6))
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks { value in
+                        AxisValueLabel {
+                            if let key = value.as(String.self) {
+                                Text(weekdayLetter(key))
+                                    .font(RTheme.caption)
+                                    .foregroundStyle(key == store.today ? Color.rForeground : Color.rMutedForeground)
+                            }
+                        }
+                    }
+                }
+                .chartYAxis(.hidden)
+                .frame(height: 110)
+            }
+        }
+    }
+
+    /// Up gets the accent and an arrow; down and flat stay muted. Slipping is
+    /// information, not an alarm, and an app that shames a slow week gets deleted.
+    @ViewBuilder
+    private var trendChip: some View {
+        if let delta = weekTrendPercent {
+            Label(
+                "\(delta > 0 ? "+" : "")\(delta)% vs last week",
+                systemImage: delta > 0 ? "arrow.up.right" : (delta < 0 ? "arrow.down.right" : "minus")
+            )
+            .font(RTheme.captionMedium)
+            .foregroundStyle(delta > 0 ? Color.rAccent : Color.rMutedForeground)
+        }
+    }
+
     private var todayCard: some View {
         if let next = store.nextSession, next.dayKey == store.today {
             RCard {
@@ -198,6 +276,31 @@ struct TrainView: View {
     private func rangeTotal(days: Int) -> Int {
         guard let start = DayKey.adding(-days, to: store.today) else { return store.repsToday }
         return Stats.total(store.state.workouts, from: start, through: store.today)
+    }
+
+    private var weekPoints: [DayPoint] {
+        guard let start = DayKey.adding(-6, to: store.today) else { return [] }
+        return store.series(from: start, through: store.today)
+    }
+
+    private var weekAverageExact: Double { Double(rangeTotal(days: 6)) / 7 }
+    private var weekAverage: Int { Int(weekAverageExact.rounded()) }
+
+    /// Percent change of this 7-day window against the 7 before it, or nil when the
+    /// previous week has nothing — a chip against an empty week is division noise, and
+    /// hiding it is honest where "+100%" would be theatre.
+    private var weekTrendPercent: Int? {
+        guard let prevStart = DayKey.adding(-13, to: store.today),
+              let prevEnd = DayKey.adding(-7, to: store.today) else { return nil }
+        let previous = Stats.total(store.state.workouts, from: prevStart, through: prevEnd)
+        guard previous > 0 else { return nil }
+        let current = rangeTotal(days: 6)
+        return Int((Double(current - previous) / Double(previous) * 100).rounded())
+    }
+
+    private func weekdayLetter(_ dayKey: String) -> String {
+        guard let date = DayKey.date(dayKey) else { return "" }
+        return date.formatted(.dateTime.weekday(.narrow))
     }
 
     private var monthTotal: Int {
