@@ -31,12 +31,13 @@ frames by their leading number, so `01.png` or `01-session.png` both work.
 | `02` | Train tab, today's single set | One set. Two minutes. |
 | `03` | Plan tab, showing the sets control | Got more time today? |
 | `04` | Profile tab, month grid | Every number you've put in |
-| `05` | The placement sheet | No watch, no camera |
+| `05` | The placement sheet | No watch, no wearables |
 | `06` | Profile ▸ records | Streaks that survive real life |
 
-Screenshot 01 is the awkward one: the proximity engine blanks the screen during a real
-set, and the simulator has no proximity sensor anyway. Switch to **Tap** in
-Settings ▸ Counting, start a set, tap a few reps in, and capture that.
+Screenshot 01 is the awkward one: the simulator has neither a TrueDepth camera nor a
+proximity sensor, so no engine can count there. Switch to **Tap** in Settings ▸ Counting,
+start a set, tap a few reps in, and capture that. The session screen looks identical
+whichever engine is running, apart from the pill at the bottom.
 
 The PNGs are committed. They are the source of what ships on the store page, and
 regenerating the frames from a different set of captures should be a visible diff.

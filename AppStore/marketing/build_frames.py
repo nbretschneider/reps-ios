@@ -496,11 +496,11 @@ def screen_records() -> str:
 
 
 FRAMES = [
-    ("01-session", screen_session, "It counts every rep", "Phone on the floor. Chest down, push up."),
+    ("01-session", screen_session, "It counts every rep", "Phone on the floor. Lower, push, counted."),
     ("02-train", screen_train, "One set. Two minutes.", "Not fifteen. That's why you'll actually do it."),
     ("03-plan", screen_plan, "Got more time today?", "Multiple sets is one tap, whenever you want it."),
     ("04-profile", screen_profile, "Every number you've put in", "A month at a glance."),
-    ("05-placement", screen_placement, "No watch, no camera", "The sensor your iPhone already has."),
+    ("05-placement", screen_placement, "No watch, no wearables", "The camera that unlocks your iPhone does it."),
     ("06-records", screen_records, "Streaks that survive real life", "Rest days don't break them."),
 ]
 
