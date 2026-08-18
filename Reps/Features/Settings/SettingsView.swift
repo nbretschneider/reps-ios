@@ -9,6 +9,9 @@ struct SettingsView: View {
 
     @State private var showEraseConfirm = false
     @State private var showEraseSecondConfirm = false
+    #if DEBUG
+    @State private var showDebugEraseConfirm = false
+    #endif
     @State private var exportDocument: ExportDocument?
     @State private var showExporter = false
 
@@ -53,6 +56,18 @@ struct SettingsView: View {
             Button("Erase everything and start over", role: .destructive) { store.eraseAllData() }
             Button("Keep my data", role: .cancel) {}
         }
+        #if DEBUG
+        .confirmationDialog(
+            "Erase and show onboarding?",
+            isPresented: $showDebugEraseConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Erase everything", role: .destructive) { store.eraseAllData() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Debug tool. Deletes every session on this device and returns to first run.")
+        }
+        #endif
     }
 
     // MARK: - Sections
@@ -190,8 +205,11 @@ struct SettingsView: View {
                 store.installDemoData()
                 Haptics.celebrate()
             }
+            // One confirmation, not the two the shipping button carries: this is a tool
+            // used dozens of times in a screenshot session, and a second tap that stops
+            // an accidental wipe is worth it while a third would just be friction.
             Button("Erase and show onboarding", role: .destructive) {
-                store.eraseAllData()
+                showDebugEraseConfirm = true
             }
         } header: {
             Text("Debug")
