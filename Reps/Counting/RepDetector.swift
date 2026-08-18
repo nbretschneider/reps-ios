@@ -74,11 +74,21 @@ enum RepDetectorFactory {
     }
 
     static func availableEngines() -> [CountingEngine] {
+        // Screenshot tooling, alongside "Fill with demo data". A simulator has neither a
+        // TrueDepth camera nor a proximity sensor, so the honest answer there is "tap
+        // only" — which makes the placement sheet screenshot advertise a manual tap
+        // counter instead of the engine the product actually ships with. Debug builds on
+        // a simulator therefore list all three. Double-guarded, so a device build and
+        // every archive compile the real check below and cannot ship this.
+        #if DEBUG && targetEnvironment(simulator)
+        return [.depth, .proximity, .manual]
+        #else
         var engines: [CountingEngine] = []
         if ProximityRepDetector.isAvailable { engines.append(.proximity) }
         if DepthRepDetector.isAvailable { engines.append(.depth) }
         engines.append(.manual)
         return engines
+        #endif
     }
 }
 
