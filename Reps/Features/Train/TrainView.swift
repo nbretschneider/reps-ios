@@ -64,7 +64,6 @@ struct TrainView: View {
         }
     }
 
-    @ViewBuilder
     private var weekCard: some View {
         WeekChartCard(
             bars: weekBars,
@@ -73,6 +72,9 @@ struct TrainView: View {
         )
     }
 
+    // Load-bearing: this property is an if/else chain over four states, and without the
+    // builder attribute it does not compile.
+    @ViewBuilder
     private var todayCard: some View {
         if let next = store.nextSession, next.dayKey == store.today {
             RCard {
