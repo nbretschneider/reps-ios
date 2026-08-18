@@ -47,7 +47,12 @@ public enum DemoData {
     public static func state(
         today: Date = Date(),
         calendar: Calendar = .current,
-        trainingWeekdays: Set<Int> = [2, 4, 6]
+        // Every day, matching what a real new user now gets. While this was Mon/Wed/Fri
+        // the demo state described a plan the app no longer creates, and the Train tab's
+        // seven-day chart screenshotted with three bars and four gaps — which also made
+        // the week-over-week trend swing on whether a window happened to catch three
+        // sessions or four, rather than on progression.
+        trainingWeekdays: Set<Int> = [1, 2, 3, 4, 5, 6, 7]
     ) -> PersistedState {
         var rolls = Rolls(seed: 0x5EED_5EED)
         var workouts: [Workout] = []

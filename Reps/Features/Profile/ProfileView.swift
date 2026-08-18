@@ -147,9 +147,11 @@ struct ProfileView: View {
         return RCard {
             VStack(alignment: .leading, spacing: RTheme.Spacing.stack) {
                 SectionHeader(icon: "trophy.fill", title: "Records")
-                recordRow("Best set", value: "\(records.bestSet)", detail: records.bestSetDayKey)
+                // Day keys are storage, not copy. "2026-07-31" under a record reads like
+                // a database dump, and this card is on a store screenshot.
+                recordRow("Best set", value: "\(records.bestSet)", detail: friendlyDay(records.bestSetDayKey))
                 Divider()
-                recordRow("Best day", value: Format.reps(records.bestDay), detail: records.bestDayKey)
+                recordRow("Best day", value: Format.reps(records.bestDay), detail: friendlyDay(records.bestDayKey))
                 Divider()
                 recordRow("Longest streak", value: "\(records.longestStreak) days", detail: nil)
                 Divider()
@@ -190,7 +192,11 @@ struct ProfileView: View {
                         Text("Reps Pro")
                             .font(RTheme.heading)
                             .foregroundStyle(Color.rForeground)
-                        Text("The classic programs, full history, Precision mode, widgets.")
+                        // Not "Precision mode": that is free, and the doc has said so
+                        // since the engine became the default. An upsell naming a free
+                        // feature is the kind of thing a reviewer notices before a user
+                        // does, and this card is on a store screenshot.
+                        Text("The classic programs, full history, widgets, Health and export.")
                             .font(RTheme.caption)
                             .foregroundStyle(Color.rMutedForeground)
                             .multilineTextAlignment(.leading)
@@ -347,6 +353,13 @@ struct MonthGrid: View {
     private var leadingBlanks: Int {
         guard let firstKey = points.first, let weekday = DayKey.weekday(firstKey.dayKey) else { return 0 }
         return (weekday - Calendar.current.firstWeekday + 7) % 7
+    }
+
+    /// "31 Jul 2026" rather than the stored `2026-07-31`. Nil in, nil out: a record that
+    /// has never been set has no date, and "-" would read as a date that failed to load.
+    private func friendlyDay(_ dayKey: String?) -> String? {
+        guard let dayKey, let date = DayKey.date(dayKey) else { return nil }
+        return date.formatted(.dateTime.day().month(.abbreviated).year())
     }
 
     private func dayNumber(_ dayKey: String) -> String {
