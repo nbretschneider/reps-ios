@@ -1,5 +1,15 @@
 # Real simulator captures
 
+> **These six are stale.** They were taken before the Pro card stopped advertising
+> Precision mode as paid, before records printed real dates, and before demo data trained
+> seven days a week, so all three of those bugs are visible in them. `05-placement` is
+> also unusable: the simulator had no TrueDepth camera and no proximity sensor, so the
+> engine picker offered Tap alone and the sheet advertised a manual tap counter.
+>
+> What ships is rendered from the HTML recreations in `build_frames.py`, which are kept
+> current with the app. Do not pass `--captures` at this directory without retaking them
+> first.
+
 Drop the six screenshots here, then:
 
     python3 AppStore/marketing/build_frames.py --captures AppStore/marketing/captures

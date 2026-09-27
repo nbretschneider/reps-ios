@@ -36,5 +36,7 @@ Package.resolved
 __pycache__/
 *.pyc
 
-# Rendered marketing frames — regenerate with AppStore/marketing/build_frames.py
-AppStore/marketing/out/
+# Rendered marketing frames are committed, not ignored. They are what gets uploaded to
+# App Store Connect, so a change to what ships on the store page should be a visible diff
+# and should arrive on the release machine with a pull, rather than depending on whoever
+# archives having Chromium and Pillow installed. Regenerate with build_frames.py.

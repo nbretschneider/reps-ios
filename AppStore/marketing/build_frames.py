@@ -16,6 +16,7 @@ Requires: Pillow, and a Chromium-family browser (see CHROME_CANDIDATES).
 from __future__ import annotations
 
 import base64
+import calendar
 import colorsys
 import os
 import pathlib
@@ -245,6 +246,105 @@ def chrome(inner: str, tab: str | None = None, dark_status=True) -> str:
     return f'<div class="screen">{status}<div class="notch"></div>{inner}{tabs}</div>'
 
 
+# One month of history, and every total on every frame is derived from it. The numbers
+# used to be typed per screen, so Train claimed 60 today while Profile claimed 68 — nobody
+# compares two store screenshots side by side until the one time somebody does.
+#
+# The variation is the point: a plan session is about 60, and the days that run higher are
+# an open set stacked on top, the days that run lower are a short one. A week of identical
+# bars is both a lie about how people train and a boring chart, and it puts the average
+# rule flat along the top of the bars where it reads as a ceiling rather than a mean.
+MONTH_DAILY = [60, 60, 85, 58, 60, 40, 62, 60, 88, 60, 55, 62, 60, 72,
+               60, 45, 63, 60, 90, 61, 60, 48, 62, 84, 60, 63, 60]
+TODAY_DAY = len(MONTH_DAILY)                       # 27 September 2026
+WEEK_DAILY = MONTH_DAILY[-7:]
+WEEK_TOTAL = sum(WEEK_DAILY)
+WEEK_AVG = round(WEEK_TOTAL / 7)
+MONTH_TOTAL = sum(MONTH_DAILY)
+MONTH_AVG = round(MONTH_TOTAL / TODAY_DAY)
+YEAR_TOTAL = 11_954
+
+# Weekday letters for the seven-day chart, taken from the calendar rather than typed.
+# Hand-typed letters put "today" on a Monday while the month grid put the 27th on a
+# Sunday, which is the sort of thing that is invisible until both frames are on one page.
+_MONTH_FIRST_WEEKDAY = calendar.monthrange(2026, 9)[0]                     # Monday = 0
+WEEK_LETTERS = ["MTWTFSS"[(_MONTH_FIRST_WEEKDAY + TODAY_DAY - 7 + i) % 7] for i in range(7)]
+
+
+def week_chart(values, letters, today_index, average) -> str:
+    """The Train tab's seven-day card, drawn the way `WeekChartCard` draws it.
+
+    One bar per day, a dashed rule at the average so every bar reads as above or below
+    the line to beat, and today's weekday letter in full-strength ink. No y-axis: the
+    hero number above the chart is the scale.
+    """
+    peak = max(values) or 1
+    height = 110
+    columns = "".join(
+        f'<div style="flex:1;display:flex;align-items:flex-end;justify-content:center;'
+        f'height:{height}px;">'
+        f'<div style="width:62%;height:{max(4, round(height * v / peak))}px;'
+        f'background:{T["primary"]};border-radius:3px 3px 0 0;"></div></div>'
+        for v in values
+    )
+    labels = "".join(
+        f'<div style="flex:1;text-align:center;font-size:13px;'
+        f'color:{T["fg"] if i == today_index else T["mutedFg"]};'
+        f'{"font-weight:700;" if i == today_index else ""}">{letter}</div>'
+        for i, letter in enumerate(letters)
+    )
+    return f"""
+    <div style="position:relative;margin-top:4px;">
+      <div style="display:flex;gap:6px;align-items:flex-end;">{columns}</div>
+      <div style="position:absolute;left:0;right:0;
+                  bottom:{round(height * average / peak)}px;
+                  border-top:1px dashed {T['mutedFg']};opacity:.55;"></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:6px;">{labels}</div>"""
+
+
+def scope_chart_card() -> str:
+    """Profile's scope chart: the Week / Month / Year switch over a dense bar chart.
+
+    It sits between the month grid and the records in the real tab, and both frames that
+    show that tab were leaving its space empty.
+    """
+    peak = max(MONTH_DAILY)
+    height = 124
+    bars = "".join(
+        f'<div style="flex:1;background:{T["primary"]};border-radius:2px 2px 0 0;'
+        f'height:{max(3, round(height * value / peak))}px;"></div>'
+        for value in MONTH_DAILY
+    )
+    scopes = "".join(
+        f'<div style="flex:1;text-align:center;padding:8px;border-radius:9px;'
+        f'font-size:13px;font-weight:700;'
+        f'background:{T["card"] if name == "Month" else "transparent"};'
+        f'color:{T["fg"] if name == "Month" else T["mutedFg"]};">{name}</div>'
+        for name in ("Week", "Month", "Year")
+    )
+    gridlines = "".join(
+        f'<div style="position:absolute;left:34px;right:0;bottom:{round(height * f)}px;'
+        f'border-top:1px solid {T["border"]};"></div>'
+        for f in (0.0, 0.5, 1.0)
+    )
+    labels = "".join(
+        f'<div style="position:absolute;left:0;bottom:{round(height * f) - 7}px;'
+        f'font-size:11px;color:{T["mutedFg"]};">{round(peak * f)}</div>'
+        for f in (0.0, 0.5, 1.0)
+    )
+    return f"""
+<div class="card">
+  <div style="display:flex;gap:4px;background:{T['muted']};border-radius:11px;
+              padding:3px;margin-bottom:14px;">{scopes}</div>
+  <div style="position:relative;height:{height}px;">
+    {gridlines}{labels}
+    <div style="position:absolute;left:34px;right:0;bottom:0;display:flex;gap:3px;
+                align-items:flex-end;">{bars}</div>
+  </div>
+</div>"""
+
+
 # ---------------------------------------------------------------- screens
 
 
@@ -266,13 +366,38 @@ def screen_session() -> str:
   <div style="display:flex;justify-content:center;margin-bottom:20px;">
     <div style="background:rgba(0,0,0,.28);border-radius:999px;padding:10px 16px;
                 color:#fff;font-size:13px;font-weight:700;display:flex;gap:14px;">
-      <span>43 done</span><span>60 target</span><span>Sensor</span>
+      <!-- Depth mode replaces the engine name with the live face distance, which is
+           what the session HUD actually shows once the camera has you. -->
+      <span>43 done</span><span>60 target</span><span>24 cm</span>
     </div>
   </div>
-  <div style="display:flex;justify-content:center;gap:32px;margin-bottom:64px;">
-    <div style="width:52px;height:52px;border-radius:999px;background:rgba(0,0,0,.28);"></div>
-    <div style="width:78px;height:78px;border-radius:999px;background:rgba(0,0,0,.35);"></div>
-    <div style="width:52px;height:52px;border-radius:999px;background:rgba(0,0,0,.28);"></div>
+  <!-- Mute, finish set, end session. Featureless circles read as placeholders rather
+       than controls, which is the one thing a store screenshot cannot afford. -->
+  <div style="display:flex;justify-content:center;align-items:center;gap:32px;
+              margin-bottom:64px;">
+    <div style="width:52px;height:52px;border-radius:999px;background:rgba(0,0,0,.28);
+                display:flex;align-items:center;justify-content:center;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff">
+        <path d="M4 9v6h4l5 4V5L8 9H4z"/>
+        <path d="M16.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="#fff" stroke-width="2"
+              stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div style="width:78px;height:78px;border-radius:999px;background:rgba(0,0,0,.35);
+                display:flex;align-items:center;justify-content:center;">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 21V4"/><path d="M5 5h13l-2.5 4L18 13H5z" fill="#fff" stroke="none"/>
+        <path d="M5 5h13l-2.5 4L18 13H5z"/>
+      </svg>
+    </div>
+    <div style="width:52px;height:52px;border-radius:999px;background:rgba(0,0,0,.28);
+                display:flex;align-items:center;justify-content:center;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff"
+           stroke-width="2.4" stroke-linecap="round">
+        <path d="M6 6l12 12M18 6L6 18"/>
+      </svg>
+    </div>
   </div>
 </div>"""
 
@@ -282,9 +407,19 @@ def screen_train() -> str:
 <div class="body">
   <div class="title">Train</div>
   <div class="tiles">
-    <div class="tile"><div class="k">Today</div><div class="v">60</div></div>
-    <div class="tile"><div class="k">Week</div><div class="v">186</div></div>
-    <div class="tile"><div class="k">Month</div><div class="v">757</div></div>
+    <div class="tile"><div class="k">Today</div><div class="v">{MONTH_DAILY[-1]}</div></div>
+    <div class="tile"><div class="k">Week</div><div class="v">{WEEK_TOTAL}</div></div>
+    <div class="tile"><div class="k">Month</div><div class="v">{MONTH_TOTAL:,}</div></div>
+  </div>
+  <div class="card">
+    <div class="hdr">Last 7 days</div>
+    <div style="display:flex;align-items:baseline;gap:8px;">
+      <div style="font-size:40px;font-weight:700;line-height:1;">{WEEK_AVG}</div>
+      <div class="cap">avg a day</div>
+      <div style="margin-left:auto;font-size:13px;font-weight:700;color:{T['accent']};">
+        &#8599; +8% vs last week</div>
+    </div>
+    {week_chart(WEEK_DAILY, WEEK_LETTERS, 6, WEEK_AVG)}
   </div>
   <div class="card">
     <div class="hdr">Today's session</div>
@@ -294,15 +429,16 @@ def screen_train() -> str:
   </div>
   <div class="card">
     <div class="row">
-      {ring(0.0, 72, f'<div style="font-size:20px;font-weight:700;">0</div>')}
+      {ring(1.0, 72, f'<div style="font-size:20px;font-weight:700;">{MONTH_DAILY[-1]}</div>',
+            color=T['accent'])}
       <div>
-        <div style="font-size:20px;font-weight:700;">14 days streak</div>
+        <div style="font-size:20px;font-weight:700;">41 days streak</div>
         <div class="cap">Rest days don't break it.</div>
       </div>
     </div>
   </div>
   <div class="card">
-    <div class="hdr">Free set</div>
+    <div class="hdr">Open set</div>
     <div class="muted">Count push-ups with no target.</div>
   </div>
 </div>"""
@@ -321,10 +457,13 @@ def screen_plan() -> str:
               {(f'<div style="font-size:20px;font-weight:700;color:{T["primary"]};">'
                  f'{sets[0]}</div>') if len(sets) == 1 else pips(sets)}
             </div>"""
+        # Consecutive days, because training days now default to all seven. While this
+        # listed Mon/Wed/Fri it advertised a schedule the app no longer creates.
         for i, (when, total, sets) in enumerate([
             ("Today", 60, [60]),
-            ("Wednesday Aug 5", 60, [60]),
-            ("Friday Aug 7", 63, [63]),
+            ("Tomorrow", 60, [60]),
+            ("Tuesday Sep 29", 63, [63]),
+            ("Wednesday Sep 30", 63, [63]),
         ])
     )
     inner = f"""
@@ -343,6 +482,8 @@ def screen_plan() -> str:
           when you finish, backs off when you don't.</div>
         <div style="font-size:13px;font-weight:700;color:{T['primary']};margin-top:8px;">
           Anchor: 100 max</div>
+        <div class="cap" style="margin-top:6px;">One working set to a number.
+          Reps raises it as you get stronger.</div>
       </div>
     </div>
   </div>
@@ -369,19 +510,31 @@ def screen_plan() -> str:
 
 
 def screen_profile() -> str:
-    reps = [0, 0, 60, 0, 62, 0, 60, 91, 0, 63, 0, 63, 30, 0, 65,
-            0, 0, 0, 65, 0, 0, 68, 65, 0, 40, 68, 0, 0, 0, 0, 0]
-    best = max(reps) or 1
-    cells = []
-    for index, value in enumerate(reps):
-        day = index + 1
-        fraction = value / best
-        color = T["accent"] if value >= 100 else T["primary"]
-        inner = f'<div style="font-size:11px;font-weight:700;">{value}</div>'
+    # September 2026, trained every day through the 27th. Leading blanks and the
+    # weekday header come from the real calendar rather than a hand-counted offset,
+    # because a grid whose columns do not line up with its own header is the kind of
+    # wrong that only shows up once it is on the store page.
+    year, month, today = 2026, 9, TODAY_DAY
+    first_weekday, days_in_month = calendar.monthrange(year, month)   # Monday = 0
+    daily = MONTH_DAILY
+    best = max(daily)
+    cells = ['<div></div>'] * first_weekday
+    for day in range(1, days_in_month + 1):
+        label = f'<div style="font-size:10px;color:{T["mutedFg"]};">{day}</div>'
+        if day > today:
+            # A day that has not happened is not a zero. The app draws it as the same
+            # dash it gives a prescribed rest day, and so does this.
+            mark = (f'<div style="width:34px;height:34px;border-radius:999px;'
+                    f'border:3px solid {T["muted"]};display:flex;align-items:center;'
+                    f'justify-content:center;font-size:11px;color:{T["mutedFg"]};">&#8211;</div>')
+        else:
+            value = daily[day - 1]
+            mark = ring(value / best, 34,
+                        f'<div style="font-size:11px;font-weight:700;">{value}</div>',
+                        color=T["primary"], width=3)
         cells.append(
             f'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">'
-            f'<div style="font-size:10px;color:{T["mutedFg"]};">{day}</div>'
-            f'{ring(fraction, 34, inner, color=color, width=3)}</div>'
+            f'{label}{mark}</div>'
         )
     weekdays = "".join(
         f'<div style="flex:1;text-align:center;font-size:13px;color:{T["mutedFg"]};">{d}</div>'
@@ -391,67 +544,83 @@ def screen_profile() -> str:
 <div class="body">
   <div class="title">Profile</div>
   <div class="tiles">
-    <div class="tile"><div class="k">Today</div><div class="v">68</div></div>
-    <div class="tile"><div class="k">Week</div><div class="v">173</div></div>
+    <div class="tile"><div class="k">Today</div><div class="v">{MONTH_DAILY[-1]}</div></div>
+    <div class="tile"><div class="k">Week</div><div class="v">{WEEK_TOTAL}</div></div>
   </div>
   <div class="tiles">
-    <div class="tile"><div class="k">Month</div><div class="v">760</div></div>
+    <div class="tile"><div class="k">Month</div><div class="v">{MONTH_TOTAL:,}</div></div>
     <div class="tile"><div class="k">Year</div>
-      <div class="v" style="color:{T['accent']};">11,954</div></div>
+      <div class="v" style="color:{T['accent']};">{YEAR_TOTAL:,}</div></div>
   </div>
   <div class="card">
-    <div style="text-align:center;font-size:20px;font-weight:700;margin-bottom:12px;">
-      AUGUST 2026</div>
+    <div style="text-align:center;font-size:20px;font-weight:700;margin-bottom:4px;">
+      SEPTEMBER 2026</div>
+    <div class="cap" style="text-align:center;margin-bottom:12px;">
+      {MONTH_TOTAL:,} push-ups this month &middot; avg {MONTH_AVG} a day</div>
     <div style="display:flex;margin-bottom:8px;">{weekdays}</div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;
                 justify-items:center;">
-      <div></div><div></div><div></div><div></div><div></div>
       {''.join(cells)}
     </div>
   </div>
+  {scope_chart_card()}
 </div>"""
     return chrome(inner, tab="Profile")
 
 
 def screen_placement() -> str:
+    """Precision mode's placement, which is the opposite of the proximity one.
+
+    Depth counting wants the camera under your face looking straight up; proximity
+    wanted the top of the phone under your sternum. This frame used to show the second
+    one with the engine picker highlighting Sensor, which advertised the engine that
+    cannot count on any phone new enough to run the depth camera.
+    """
+    engines = [("Sensor", False), ("Precision", True), ("Tap", False)]
+    picker = "".join(
+        f'<div style="flex:1;text-align:center;padding:12px;border-radius:12px;'
+        f'background:{T["primary"] if on else T["muted"]};'
+        f'color:{"#fff" if on else T["mutedFg"]};font-size:13px;font-weight:700;">'
+        f'{name}</div>'
+        for name, on in engines
+    )
     inner = f"""
 <div class="body" style="justify-content:center;padding:16px 24px;">
+  <!-- It is a sheet, and the real one carries a nav bar. Without it the screen reads as
+       a tab, which is the one thing this screen never is. -->
+  <div style="display:flex;align-items:center;justify-content:space-between;
+              margin:-4px 0 4px;">
+    <div style="font-size:15px;color:{T['primary']};">Cancel</div>
+    <div style="font-size:15px;font-weight:700;">Get set up</div>
+    <div style="width:44px;"></div>
+  </div>
   <div class="card" style="text-align:center;padding:28px 20px;">
     <svg width="54" height="54" viewBox="0 0 24 24" fill="none"
-         stroke="{T['primary']}" stroke-width="1.8" style="transform:rotate(90deg);">
-      <rect x="6" y="2" width="12" height="20" rx="3"/>
-      <circle cx="12" cy="5.2" r=".9" fill="{T['primary']}" stroke="none"/>
+         stroke="{T['primary']}" stroke-width="1.8" stroke-linecap="round">
+      <path d="M4 8V6a2 2 0 0 1 2-2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v2"/>
+      <path d="M20 16v2a2 2 0 0 1-2 2h-2"/><path d="M8 20H6a2 2 0 0 1-2-2v-2"/>
+      <path d="M9 10v1.5"/><path d="M15 10v1.5"/>
+      <path d="M12 10v3.5h-1"/><path d="M9 15.5c1.8 1.2 4.2 1.2 6 0"/>
     </svg>
     <div style="font-size:20px;font-weight:700;margin-top:12px;">
-      Phone flat on the floor, screen up, under your chest</div>
+      Phone flat on the floor, screen up, directly under your face</div>
     <div class="cap" style="margin-top:8px;">
-      Lower until your chest is just above it, then push back up.</div>
+      The camera should look straight up at you. It says tracking once it sees your
+      face, and counting is automatic from there.</div>
   </div>
   <div style="margin-top:16px;">
     <div class="hdr">Counting</div>
-    <div style="display:flex;gap:8px;">
-      <div style="flex:1;text-align:center;padding:12px;border-radius:12px;
-                  background:{T['primary']};color:#fff;font-size:13px;font-weight:700;">
-        Sensor</div>
-      <div style="flex:1;text-align:center;padding:12px;border-radius:12px;
-                  background:{T['muted']};color:{T['mutedFg']};font-size:13px;font-weight:700;">
-        Precision</div>
-      <div style="flex:1;text-align:center;padding:12px;border-radius:12px;
-                  background:{T['muted']};color:{T['mutedFg']};font-size:13px;font-weight:700;">
-        Tap</div>
-    </div>
+    <div style="display:flex;gap:8px;">{picker}</div>
   </div>
   <div style="margin-top:16px;background:rgba(244,92,150,.10);border-radius:12px;
               padding:12px;">
     <div class="muted" style="color:{T['mutedFg']};">
-      Put the phone on the floor under your chest. Lower until your chest is over it,
-      then push.</div>
-    <div style="font-size:13px;color:{T['primary']};margin-top:8px;">
-      The screen going black at the bottom of each rep is the sensor working, not a bug.</div>
+      The front camera measures how far you lower on each rep and scores your depth.
+      The screen stays on.</div>
   </div>
   <div style="margin-top:16px;display:flex;gap:8px;">
     <div style="flex:1;padding:10px;border-radius:12px;background:{T['primary']};color:#fff;
-                text-align:center;font-size:13px;font-weight:700;">One set · 60</div>
+                text-align:center;font-size:13px;font-weight:700;">One set &middot; 60</div>
     <div style="flex:1;padding:10px;border-radius:12px;background:{T['muted']};
                 color:{T['mutedFg']};text-align:center;font-size:13px;font-weight:700;">
       Multiple sets</div>
@@ -473,21 +642,29 @@ def screen_records() -> str:
           </div>
         </div>"""
 
+    # Dates read as dates. The card used to print the stored day key, so a personal
+    # best was dated "2026-08-06" like a row out of a database.
     inner = f"""
 <div class="body" style="justify-content:center;">
+  {scope_chart_card()}
   <div class="card">
     <div class="hdr">Records</div>
-    {record("Best set", "91", "2026-08-06")}
-    {record("Best day", "91", "2026-08-08")}
+    {record("Best set", "91", "6 Aug 2026")}
+    {record("Best day", "91", "8 Aug 2026")}
     {record("Longest streak", "41 days", "")}
     {record("All time", "11,954", "212 sessions")}
   </div>
   <div class="card" style="margin-top:16px;">
     <div class="row">
-      {ring(1.0, 72, f'<div style="font-size:26px;color:{T["accent"]};">✓</div>', color=T['accent'])}
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="{T['primary']}">
+        <path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/>
+      </svg>
       <div>
-        <div style="font-size:20px;font-weight:700;">Done for today</div>
-        <div class="cap">68 push-ups logged.</div>
+        <div style="font-size:20px;font-weight:700;">Reps Pro</div>
+        <!-- Not "Precision mode": that engine is free, and an upsell naming a free
+             feature is a metadata mismatch a reviewer checks for. -->
+        <div class="cap" style="margin-top:2px;">The classic programs, full history,
+          widgets, Health and export.</div>
       </div>
     </div>
   </div>
