@@ -36,16 +36,26 @@ git pull --ff-only
 step "Package tests"
 # The rep machines, the plan engine, streaks and persistence. About a second, no simulator.
 #
-# Retried once after wiping `.build`, because of a macOS failure mode that has nothing to
-# do with the code: codesign refuses the test bundle with "resource fork, Finder
-# information, or similar detritus not allowed" when extended attributes end up on the
-# build products. It shows up after an Xcode update or a fresh `xcodebuild -license`
-# acceptance, the build products are disposable, and a preflight that stops on it sends
-# you hunting for a test failure that does not exist.
+# Retried once somewhere else entirely, because of a macOS failure mode that has nothing
+# to do with the code: codesign refuses the test bundle with "resource fork, Finder
+# information, or similar detritus not allowed" when extended attributes land on the
+# build products.
+#
+# This checkout lives under ~/Desktop, which macOS syncs to iCloud Drive by default, and
+# iCloud tags everything it touches with `com.apple.fileprovider` attributes. So the
+# attributes are re-applied as fast as the build writes the bundle, which is why deleting
+# `.build` and building again in the same place does not help — it was tried, by hand,
+# and failed identically the second time.
+#
+# The retry therefore builds in a scratch directory outside the synced tree, and strips
+# any attributes already on the package first. A preflight that stops here sends you
+# hunting for a test failure that does not exist.
 if ! (cd RepsKit && swift test); then
-    echo "package tests failed; wiping RepsKit/.build and retrying once"
+    echo "package tests failed; retrying in a scratch directory outside the synced folder"
     rm -rf RepsKit/.build
-    (cd RepsKit && swift test) || fail "RepsKit tests failed"
+    xattr -cr RepsKit 2>/dev/null || true
+    (cd RepsKit && swift test --scratch-path "${TMPDIR:-/tmp}/repskit-build") \
+        || fail "RepsKit tests failed"
 fi
 
 step "App group consistency"
