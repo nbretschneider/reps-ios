@@ -259,6 +259,17 @@ struct ProfileView: View {
         guard let start = DayKey.adding(-days, to: store.today) else { return [] }
         return store.series(from: start, through: store.today)
     }
+
+    /// "31 Jul 2026" rather than the stored `2026-07-31`. Nil in, nil out: a record that
+    /// has never been set has no date, and "-" would read as a date that failed to load.
+    ///
+    /// Belongs to `ProfileView` because `recordsCard` is its only caller. It briefly lived
+    /// in `MonthGrid` further down this file, which compiled as a perfectly good unused
+    /// method and failed only at the call sites.
+    private func friendlyDay(_ dayKey: String?) -> String? {
+        guard let dayKey, let date = DayKey.date(dayKey) else { return nil }
+        return date.formatted(.dateTime.day().month(.abbreviated).year())
+    }
 }
 
 /// The month calendar of per-day rings — the strongest single element in this category of
@@ -353,13 +364,6 @@ struct MonthGrid: View {
     private var leadingBlanks: Int {
         guard let firstKey = points.first, let weekday = DayKey.weekday(firstKey.dayKey) else { return 0 }
         return (weekday - Calendar.current.firstWeekday + 7) % 7
-    }
-
-    /// "31 Jul 2026" rather than the stored `2026-07-31`. Nil in, nil out: a record that
-    /// has never been set has no date, and "-" would read as a date that failed to load.
-    private func friendlyDay(_ dayKey: String?) -> String? {
-        guard let dayKey, let date = DayKey.date(dayKey) else { return nil }
-        return date.formatted(.dateTime.day().month(.abbreviated).year())
     }
 
     private func dayNumber(_ dayKey: String) -> String {
