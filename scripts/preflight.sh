@@ -35,7 +35,18 @@ git pull --ff-only
 
 step "Package tests"
 # The rep machines, the plan engine, streaks and persistence. About a second, no simulator.
-(cd RepsKit && swift test)
+#
+# Retried once after wiping `.build`, because of a macOS failure mode that has nothing to
+# do with the code: codesign refuses the test bundle with "resource fork, Finder
+# information, or similar detritus not allowed" when extended attributes end up on the
+# build products. It shows up after an Xcode update or a fresh `xcodebuild -license`
+# acceptance, the build products are disposable, and a preflight that stops on it sends
+# you hunting for a test failure that does not exist.
+if ! (cd RepsKit && swift test); then
+    echo "package tests failed; wiping RepsKit/.build and retrying once"
+    rm -rf RepsKit/.build
+    (cd RepsKit && swift test) || fail "RepsKit tests failed"
+fi
 
 step "App group consistency"
 # A silent mismatch here gives the widget its own empty container and looks exactly like
