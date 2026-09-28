@@ -63,7 +63,10 @@ struct DemoDataTests {
         )
         let streak = Stats.streak(trainedDays: trained, restDays: rest, today: todayKey, calendar: utc)
         // Rest days pass through without incrementing, so the floor is the number of
-        // *training* days in the missed-session-free tail: three a week.
+        // *training* days in the missed-session-free tail. Kept at three a week rather
+        // than the seven the demo now generates: this is a floor, and pinning it to the
+        // current schedule would make the test fail the next time the default changes
+        // rather than when the streak rules break.
         #expect(streak >= DemoData.cleanTailDays / 7 * 3)
     }
 

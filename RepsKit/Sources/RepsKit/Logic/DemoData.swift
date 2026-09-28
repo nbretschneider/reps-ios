@@ -101,22 +101,36 @@ public enum DemoData {
                         completed: completed,
                         startedAt: started,
                         duration: Double(completed) * Double(rolls.inRange(2...3)),
-                        engine: .proximity
+                        // Depth, with a score, because that is the engine the app runs
+                        // by default and the one whose history Pro sells. A demo state
+                        // recorded entirely as proximity has no depth anywhere, so the
+                        // screens that show a depth score screenshot empty.
+                        averageDepth: Double(rolls.inRange(74...93)) / 100,
+                        averageTravel: Double(rolls.inRange(26...38)) / 100,
+                        engine: .depth
                     )],
                     planID: PlanCatalog.adaptiveID,
                     sessionIndex: sessionsDone
                 ))
                 sessionsDone += 1
-            } else if rolls.chance(14) {
-                // A free set at a desk on an off day. Counts toward the day, never toward
-                // the plan.
+            }
+
+            // A free set at a desk, on top of whatever else the day held. Counts toward
+            // the day, never toward the plan.
+            //
+            // Deliberately not an `else` on the training day, which is what it used to
+            // be: training days now default to all seven, so an off-day-only rule made
+            // this branch unreachable and the demo state lost free sets entirely. It is
+            // also the more honest history — the days that run above the prescription
+            // are a plan session with an open set stacked on it.
+            if rolls.chance(14) {
                 let started = at(date, hour: rolls.inRange(9...21), calendar: calendar)
                 let reps = rolls.inRange(10...25)
                 workouts.append(Workout(
                     dayKey: dayKey,
                     startedAt: started,
                     sets: [CompletedSet(target: 0, completed: reps, startedAt: started,
-                                        duration: Double(reps) * 2.4, engine: .proximity)]
+                                        duration: Double(reps) * 2.4, engine: .depth)]
                 ))
             }
         }
@@ -125,7 +139,12 @@ public enum DemoData {
         state.workouts = workouts
         state.maxTests = maxTests
         state.hasCompletedOnboarding = true
-        state.settings = Preferences(engine: .proximity, voice: .everyRep, syncToHealth: false)
+        // Depth, and `engineUpgraded` set, so filling with demo data does not quietly
+        // hand the device back the engine that cannot count. This used to write
+        // `.proximity`, which meant every screenshot session had to re-pick Precision
+        // after loading the data, and whoever forgot photographed the wrong engine.
+        state.settings = Preferences(engine: .depth, voice: .everyRep, syncToHealth: false,
+                                     engineUpgraded: true)
         state.plan = PlanState(
             planID: PlanCatalog.adaptiveID,
             baseMax: finalMax,
