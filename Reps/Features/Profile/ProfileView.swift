@@ -9,8 +9,6 @@ struct ProfileView: View {
     }
 
     @Environment(RepsStore.self) private var store
-    @Environment(PurchaseStore.self) private var purchases
-    @Environment(TabRouter.self) private var router
 
     @State private var scope: Scope = .month
     /// Months back from the current one. Zero is this month.
@@ -27,7 +25,6 @@ struct ProfileView: View {
                         chartCard
                         depthCard
                         recordsCard
-                        if !purchases.isPro { upgradeCard }
                     }
                     .padding(RTheme.Spacing.page)
                 }
@@ -102,101 +99,51 @@ struct ProfileView: View {
                 }
                 .pickerStyle(.segmented)
 
-                if purchases.isPro || scope == .week {
-                    Chart(chartPoints) { point in
-                        BarMark(
-                            x: .value("Day", point.dayKey),
-                            y: .value("Reps", point.reps)
-                        )
-                        .cornerRadius(3)
-                        .foregroundStyle(point.hitGoal ? Color.rAccent : Color.rChart1)
-                    }
-                    .chartXAxis(.hidden)
-                    .chartYAxis {
-                        AxisMarks(position: .leading) { _ in
-                            AxisGridLine().foregroundStyle(Color.rCardBorder)
-                            AxisValueLabel().font(RTheme.caption)
-                        }
-                    }
-                    .frame(height: 160)
-                } else {
-                    lockedChart
+                Chart(chartPoints) { point in
+                    BarMark(
+                        x: .value("Day", point.dayKey),
+                        y: .value("Reps", point.reps)
+                    )
+                    .cornerRadius(3)
+                    .foregroundStyle(point.hitGoal ? Color.rAccent : Color.rChart1)
                 }
+                .chartXAxis(.hidden)
+                .chartYAxis {
+                    AxisMarks(position: .leading) { _ in
+                        AxisGridLine().foregroundStyle(Color.rCardBorder)
+                        AxisValueLabel().font(RTheme.caption)
+                    }
+                }
+                .frame(height: 160)
             }
         }
     }
 
-    private var lockedChart: some View {
-        VStack(spacing: RTheme.Spacing.stack) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 24))
-                .foregroundStyle(Color.rPrimary)
-            Text("Monthly and yearly history is part of Pro.")
-                .font(RTheme.body)
-                .foregroundStyle(Color.rMutedForeground)
-                .multilineTextAlignment(.center)
-            Button("See Pro") { router.showPaywall = true }
-                .font(RTheme.bodyMedium)
-                .tint(.rPrimary)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 160)
-    }
-
     /// How deep, over the last thirty days.
-    ///
-    /// Pro, deliberately and narrowly: counting depth is free on every engine and always
-    /// will be, and what Pro sells is the *history* of those scores rather than the ability
-    /// to measure them. The post-session summary shows the same chart for the session you
-    /// just did, free, for exactly that reason.
     @ViewBuilder
     private var depthCard: some View {
         // Only ever drawn when there is depth history to draw. Someone who counts by
-        // tapping has none, and an empty chart with a padlock on it is an advert for
-        // something they cannot use.
+        // tapping has none, and an empty chart is not worth a card.
         if hasAnyDepthHistory {
             RCard {
                 VStack(alignment: .leading, spacing: RTheme.Spacing.stack) {
                     SectionHeader(icon: "arrow.down.to.line", title: "Depth")
 
-                    if purchases.isPro {
-                        if let summary = depthSummary {
-                            DepthVerdict(summary: summary, comparison: depthTrend)
-                            DepthHistogram(bins: DepthStats.histogram(recentTravels))
-                            Text(depthFootnote(summary))
-                                .font(RTheme.caption)
-                                .foregroundStyle(Color.rMutedForeground)
-                                .fixedSize(horizontal: false, vertical: true)
-                        } else {
-                            Text("No measured reps in the last 30 days. Precision mode scores every rep it counts.")
-                                .font(RTheme.body)
-                                .foregroundStyle(Color.rMutedForeground)
-                        }
+                    if let summary = depthSummary {
+                        DepthVerdict(summary: summary, comparison: depthTrend)
+                        DepthHistogram(bins: DepthStats.histogram(recentTravels))
+                        Text(depthFootnote(summary))
+                            .font(RTheme.caption)
+                            .foregroundStyle(Color.rMutedForeground)
+                            .fixedSize(horizontal: false, vertical: true)
                     } else {
-                        lockedDepth
+                        Text("No measured reps in the last 30 days. Precision mode scores every rep it counts.")
+                            .font(RTheme.body)
+                            .foregroundStyle(Color.rMutedForeground)
                     }
                 }
             }
         }
-    }
-
-    private var lockedDepth: some View {
-        VStack(spacing: RTheme.Spacing.stack) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 24))
-                .foregroundStyle(Color.rPrimary)
-            // Says what is locked and what is not, because the thing that measures depth
-            // is free and an upsell that implies otherwise is a lie about the product.
-            Text("Counting your depth is free. Keeping its history is part of Pro.")
-                .font(RTheme.body)
-                .foregroundStyle(Color.rMutedForeground)
-                .multilineTextAlignment(.center)
-            Button("See Pro") { router.showPaywall = true }
-                .font(RTheme.bodyMedium)
-                .tint(.rPrimary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, RTheme.Spacing.stack)
     }
 
     private var recordsCard: some View {
@@ -236,36 +183,6 @@ struct ProfileView: View {
                 }
             }
         }
-    }
-
-    private var upgradeCard: some View {
-        Button { router.showPaywall = true } label: {
-            RCard {
-                HStack(spacing: RTheme.Spacing.stack) {
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(Color.rPrimary)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Reps Pro")
-                            .font(RTheme.heading)
-                            .foregroundStyle(Color.rForeground)
-                        // Not "Precision mode": that is free, and the doc has said so
-                        // since the engine became the default. An upsell naming a free
-                        // feature is the kind of thing a reviewer notices before a user
-                        // does, and this card is on a store screenshot.
-                        Text("The classic programs, full history, widgets, Health and export.")
-                            .font(RTheme.caption)
-                            .foregroundStyle(Color.rMutedForeground)
-                            .multilineTextAlignment(.leading)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.rMutedForeground)
-                }
-            }
-        }
-        .buttonStyle(.pressable)
     }
 
     // MARK: - Data

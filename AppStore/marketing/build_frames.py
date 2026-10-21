@@ -475,6 +475,10 @@ def screen_finished() -> str:
 DEPTH_BINS = [(15, 20, 1), (20, 25, 9), (25, 30, 33), (30, 35, 12)]
 DEPTH_MEDIAN_CM = 27
 
+# Thirty days of the same, for the Profile card: more reps, so a smoother curve, and a
+# longer tail of shallow ones because a month contains some bad days.
+PROFILE_DEPTH_BINS = [(15, 20, 48), (20, 25, 212), (25, 30, 684), (30, 35, 331), (35, 40, 61)]
+
 
 def depth_histogram(bins, tint: str, label: str, height: int = 92) -> str:
     """`DepthHistogram`, drawn the way the app draws it: counts above, ends labelled."""
@@ -902,18 +906,19 @@ def screen_records() -> str:
     {record("Longest streak", "41 days", "")}
     {record("All time", "11,954", "212 sessions")}
   </div>
+  <!-- The Depth card, which is where the upsell used to be. There is no upsell now:
+       the app has no in-app purchases, so this slot shows the thirty-day depth history
+       that used to sit behind the paywall. -->
   <div class="card" style="margin-top:16px;">
-    <div class="row">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="{T['primary']}">
-        <path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/>
-      </svg>
-      <div>
-        <div style="font-size:20px;font-weight:700;">Reps Pro</div>
-        <!-- Not "Precision mode": that engine is free, and an upsell naming a free
-             feature is a metadata mismatch a reviewer checks for. -->
-        <div class="cap" style="margin-top:2px;">The classic programs, full history,
-          widgets, Health and export.</div>
-      </div>
+    <div class="hdr">Depth</div>
+    <div style="display:flex;align-items:baseline;gap:8px;">
+      <div style="font-size:34px;font-weight:700;line-height:1;">26</div>
+      <div class="cap">cm median</div>
+      <div style="margin-left:auto;font-size:13px;font-weight:700;color:{T['accent']};">
+        &#8599; 3 cm</div>
+    </div>
+    <div style="margin-top:10px;">
+      {depth_histogram(PROFILE_DEPTH_BINS, T['primary'], T['mutedFg'], height=74)}
     </div>
   </div>
 </div>"""

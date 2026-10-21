@@ -1,12 +1,9 @@
 import SwiftUI
 import RepsKit
 
-/// Pick a plan. Pro plans are shown, not hidden — a locked row that explains what it is
-/// converts, and a plan the user never knew existed does not.
+/// Pick a plan. Every row is pickable — there is nothing to unlock.
 struct PlanPickerSheet: View {
     @Environment(RepsStore.self) private var store
-    @Environment(PurchaseStore.self) private var purchases
-    @Environment(TabRouter.self) private var router
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -34,15 +31,9 @@ struct PlanPickerSheet: View {
 
     private func planRow(_ template: PlanTemplate) -> some View {
         let isCurrent = store.state.plan?.planID == template.id
-        let locked = template.isPro && !purchases.isPro
 
         return Button {
-            if locked {
-                dismiss()
-                router.showPaywall = true
-            } else {
-                select(template)
-            }
+            select(template)
         } label: {
             RCard {
                 VStack(alignment: .leading, spacing: RTheme.Spacing.inline) {
@@ -50,11 +41,6 @@ struct PlanPickerSheet: View {
                         Text(template.name)
                             .font(RTheme.heading)
                             .foregroundStyle(Color.rForeground)
-                        if locked {
-                            Image(systemName: "lock.fill")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Color.rPrimary)
-                        }
                         Spacer()
                         if isCurrent {
                             Image(systemName: "checkmark.circle.fill")

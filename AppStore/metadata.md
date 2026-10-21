@@ -117,13 +117,11 @@ No account. No server. No sync. No analytics. Nothing to sign up for and nothing
 Sessions can be written to Apple Health if you want them to count toward your rings, and
 exported as a spreadsheet whenever you like.
 
-FREE FOREVER
+FREE. ALL OF IT.
 
-Rep counting, your adaptive plan, open sets, the daily goal, your streak and the last 30
-days of history are free and always will be.
-
-Reps Pro adds the published programs, your full history and charts, every rep's depth score
-kept over time, widgets, Apple Health, and export.
+No subscription, no in-app purchases, no locked features, no trial that runs out. Every
+plan, every counting mode, your whole history, the depth charts, the widgets, Apple Health
+and export. There is nothing to buy and nothing to upgrade to.
 ```
 
 ---
@@ -194,77 +192,21 @@ requires the pair.
 
 ## In-app purchases
 
-| Product | ID | Type | Price | Trial |
-|---|---|---|---|---|
-| Reps Pro (Annual) | `com.gradedays.reps.pro.annual` | Auto-renewable | $9.99/yr | 7 days free |
-| Reps Pro (Monthly) | `com.gradedays.reps.pro.monthly.v2` | Auto-renewable | $1.99/mo | 7 days free |
-| Reps Pro (Lifetime) | `com.gradedays.reps.pro.lifetime` | Non-consumable | $19.99 | n/a |
+**There are none.** The app is free in full: every plan, every counting engine, the whole
+history, the depth analytics, widgets, Health sync and CSV export.
 
-Subscription group: `Reps Pro`. Annual is the default selection on the paywall.
+This is what makes the submission short. A free app with no in-app purchases does **not**
+need the Paid Applications agreement, a bank account, tax forms, the Small Business
+Program, product listings, or a review screenshot per product — and there is no
+"submit the products with the app or they wait forever" trap, because there are no
+products. The free-app agreement is already accepted on every account.
 
-Priced deliberately low. Annual is 83 cents a month and a 58% saving over monthly, so it is
-the obvious pick — which is the point, because annual subscribers churn far less. There are
-no server costs behind any of this, so cheap costs nothing to sustain.
+The subscription that used to be specified here (three tiers, `Reps Pro` group, 7-day
+trial) was built and then removed. If it ever comes back it is a new decision, not a
+restoration: anything free today that moves behind a paywall tomorrow is taken away from
+everyone already using it.
 
-**A price can be lowered whenever you like. Raising it on existing subscribers requires
-each of them to actively opt in, and most never do.** So whatever ships is effectively
-permanent for everyone who signs up early. Worth being sure before the first release.
-
-The trial is 7 days rather than 3 because Reps schedules three sessions a week: a 3-day
-trial can contain a single workout, which is not enough to see the plan adapt. Seven days
-is one full training week, the smallest unit that demonstrates what the app actually does.
-
-**Display names must match the paywall**, which reads them off the product rather than
-hardcoding, so whatever is typed into App Store Connect is what the user sees.
-
-Review notes for IAP: the paywall is reachable from Profile ▸ Reps Pro and appears once
-after onboarding. It is always dismissible, and the app is fully functional without it.
-
-### Setting these up in App Store Connect
-
-Written out in full because this is the first Reps release that takes money, and two of
-these steps block people for days without making it obvious that they are the cause.
-
-**1. Business (formerly "Agreements, Tax, and Banking") must read Active.**
-Accept the **Paid Applications** agreement, add a **bank account**, and complete the **tax
-forms**. Until this is Active, products do not load **even in sandbox** — and the symptom
-is the paywall showing "Pricing is unavailable", which looks exactly like a code bug and is
-not one. Check here first whenever products fail to appear.
-
-**2. Apply to the Apple Small Business Program.**
-Commission drops from 30% to **15%** for developers under $1M a year. It is a short form
-under Business, it has to be applied for, and it is not automatic or retroactive within a
-year. Missing it is the most expensive routine mistake a first release makes. At $9.99 a
-year that is the difference between keeping $6.99 and keeping $8.49 per subscriber.
-
-**3. Create the products.** IDs must match `PurchaseStore.productIDs` **exactly**, character
-for character — a typo does not error anywhere, it just silently produces no products.
-
-> **Never delete a product to rename it.** App Store Connect retires a product ID the
-> moment it is created and never releases it, even for a product deleted seconds later and
-> never submitted. Reference names, display names and prices are all editable in place;
-> deleting is the one action that cannot be undone. This is why the monthly ID carries a
-> `.v2` suffix.
-
-- Subscription group **`Reps Pro`** first, then the annual and monthly subscriptions inside
-  it. Being in one group is what lets someone switch between them and what stops them
-  buying both.
-- The lifetime unlock is created separately as a **non-consumable**, not in the group.
-- Add the 7-day free trial as an **Introductory Offer** on each subscription.
-
-**4. Attach a paywall screenshot to each subscription.**
-Not the app's screenshots — a screenshot on the product itself, for the reviewer. Without
-it the product stays in "Missing Metadata" and cannot be submitted at all.
-
-**5. Submit the products with the first app version.**
-They do not go live separately, and a version submitted without them will ship a paywall
-with nothing behind it.
-
-Payouts arrive roughly 30 to 45 days after each month closes, once Apple's minimum
-threshold is met.
-
-Locally none of this is needed: `Reps.storekit` is wired into the scheme's Run action, so
-the paywall works in the simulator against fake products. See CLAUDE.md.
+Pricing: **Free**, all territories, no IAP. App Store Connect ▸ Pricing and Availability.
 
 ---
 
@@ -285,7 +227,7 @@ the app speaks the count so the screen is not needed. Settings > Counting has a 
 check and a Sensor check that show each sensor's raw state if you want to see them
 directly.
 
-The app has no account, no server and no network calls other than StoreKit.
+The app has no account, no server, no network calls and no in-app purchases.
 ```
 
 ---
@@ -306,7 +248,7 @@ before anyone swipes. So it counts, it does not stop you, and you pick the numbe
    "where does this number even come from".
 4. **Train tab.** The seven-day chart, today's number, START TRAINING.
 5. **Depth.** The post-session distribution in centimetres. Free, because it is the session
-   you just did; the Profile tab's thirty-day version is the Pro one.
+   you just did; the Profile tab carries a thirty-day version of the same chart.
 6. **Plan tab.** The block ring, the anchor, the one-set / multiple-sets switch, the
    upcoming schedule.
 7. **Profile.** The month grid of rings.

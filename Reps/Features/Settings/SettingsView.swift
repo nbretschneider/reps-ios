@@ -4,8 +4,6 @@ import RepsKit
 
 struct SettingsView: View {
     @Environment(RepsStore.self) private var store
-    @Environment(PurchaseStore.self) private var purchases
-    @Environment(TabRouter.self) private var router
 
     @State private var showEraseConfirm = false
     @State private var showEraseSecondConfirm = false
@@ -22,7 +20,6 @@ struct SettingsView: View {
             restSection
             remindersSection
             healthSection
-            proSection
             dataSection
             aboutSection
             #if DEBUG
@@ -166,7 +163,7 @@ struct SettingsView: View {
     private var healthSection: some View {
         Section {
             Toggle("Save sessions to Health", isOn: healthBinding)
-                .disabled(!HealthSync.isAvailable || !purchases.isPro)
+                .disabled(!HealthSync.isAvailable)
             if store.state.settings.syncToHealth {
                 Stepper(
                     bodyWeightLabel,
@@ -176,23 +173,7 @@ struct SettingsView: View {
         } header: {
             Text("Apple Health")
         } footer: {
-            Text(purchases.isPro
-                 ? "Sessions are written as functional strength training. Body weight is used only to estimate calories and is never stored anywhere else."
-                 : "Health sync is part of Reps Pro.")
-        }
-    }
-
-    private var proSection: some View {
-        Section {
-            if purchases.isPro {
-                Label("Reps Pro is active", systemImage: "checkmark.seal.fill")
-                    .foregroundStyle(Color.rAccent)
-            } else {
-                Button("Get Reps Pro") { router.showPaywall = true }
-                Button("Restore purchases") { Task { await purchases.restore() } }
-            }
-        } header: {
-            Text("Subscription")
+            Text("Sessions are written as functional strength training. Body weight is used only to estimate calories and is never stored anywhere else.")
         }
     }
 

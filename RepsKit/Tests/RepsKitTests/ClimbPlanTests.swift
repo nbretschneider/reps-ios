@@ -234,10 +234,10 @@ struct ClimbPlanTests {
         #expect(decoded.climbCeiling == PlanState.defaultClimbCeiling)
     }
 
-    @Test("The climb is free")
-    func climbIsFree() {
-        // Same reason the adaptive plan is: this is the daily loop, and a paywall in front
-        // of the daily loop gates the habit the subscription depends on.
-        #expect(PlanCatalog.template(PlanCatalog.climbID)?.isPro == false)
+    @Test("The climb is in the catalog and trains every day")
+    func climbIsOffered() {
+        let template = PlanCatalog.template(PlanCatalog.climbID)
+        #expect(template?.kind == .climb)
+        #expect(template?.sessionsPerWeek == 7)
     }
 }

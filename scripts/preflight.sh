@@ -68,18 +68,17 @@ SWIFT_GROUP="$(grep -Eo 'group\.[a-zA-Z0-9._]+' RepsKit/Sources/RepsKit/Persiste
     || fail "app group drift: project.yml has '$YML_GROUP', Swift has '$SWIFT_GROUP'"
 echo "app group: $YML_GROUP"
 
-step "StoreKit product IDs"
-# A product ID that drifts between Swift and the StoreKit config does not error anywhere.
-# The paywall just shows "Pricing is unavailable", which is the most common way a first
-# StoreKit release goes wrong.
-SWIFT_IDS="$(grep -Eo 'com\.gradedays\.reps\.pro\.[a-z0-9.]+' Reps/Stores/PurchaseStore.swift | sort -u)"
-CONFIG_IDS="$(grep -Eo 'com\.gradedays\.reps\.pro\.[a-z0-9.]+' Reps.storekit | sort -u)"
-[[ -n "$SWIFT_IDS" ]] || fail "no product IDs found in PurchaseStore.swift"
-if [[ "$SWIFT_IDS" != "$CONFIG_IDS" ]]; then
-    printf 'Swift:\n%s\n\nReps.storekit:\n%s\n' "$SWIFT_IDS" "$CONFIG_IDS" >&2
-    fail "product IDs differ between PurchaseStore.swift and Reps.storekit"
+step "No purchase machinery"
+# The app is free, with no in-app purchases at all. This checks the removal stayed
+# removed: a stray paywall or a StoreKit import means a submission that needs the Paid
+# Applications agreement, three product listings and a review screenshot apiece — the
+# whole apparatus this app deliberately does not have.
+STRAY_IAP="$(grep -rln 'PurchaseStore\|PaywallView\|import StoreKit' Reps/ || true)"
+if [[ -n "$STRAY_IAP" ]]; then
+    printf '%s\n' "$STRAY_IAP" >&2
+    fail "purchase code is back; the free-app submission assumes there is none"
 fi
-echo "$(echo "$SWIFT_IDS" | wc -l | tr -d ' ') product IDs agree"
+echo "no StoreKit, no paywall"
 
 step "Regenerate project"
 [[ -x "$XCODEGEN" ]] || fail "xcodegen not found at $XCODEGEN (set XCODEGEN=...)"
