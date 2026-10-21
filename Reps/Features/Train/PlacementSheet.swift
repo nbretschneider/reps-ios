@@ -9,8 +9,6 @@ import RepsKit
 /// moment you need to change it is the moment it did not work.
 struct PlacementSheet: View {
     @Environment(RepsStore.self) private var store
-    @Environment(PurchaseStore.self) private var purchases
-    @Environment(TabRouter.self) private var router
     @Environment(\.dismiss) private var dismiss
 
     /// Passed in for a free set, which has no plan behind it. For a plan session this is
@@ -123,21 +121,13 @@ struct PlacementSheet: View {
             SectionHeader(icon: "sensor", title: "Counting")
             HStack(spacing: RTheme.Spacing.inline) {
                 ForEach(available, id: \.self) { option in
-                    // No engine is gated. Counting is the app; charging for the one engine
-                    // that counts reliably would put the paywall in front of the product.
-                    let locked = false
                     Button {
-                        if locked {
-                            dismiss()
-                            router.showPaywall = true
-                        } else {
-                            engine = option
-                            store.update { $0.engine = option }
-                            Haptics.select()
-                        }
+                        engine = option
+                        store.update { $0.engine = option }
+                        Haptics.select()
                     } label: {
                         VStack(spacing: RTheme.Spacing.tight) {
-                            Image(systemName: locked ? "lock.fill" : option.systemImage)
+                            Image(systemName: option.systemImage)
                                 .font(.system(size: 18, weight: .semibold))
                             Text(option.label)
                                 .font(RTheme.captionMedium)

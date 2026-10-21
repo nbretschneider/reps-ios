@@ -35,6 +35,11 @@ public enum PlanKind: String, Codable, Hashable, Sendable {
 }
 
 /// A plan the user can choose. Templates are data, not code: adding one is adding a row.
+///
+/// There is no `isPro` here any more, and that is the whole shape of the app now: every
+/// plan is free, so there is no flag for the picker to gate on and no locked row to
+/// explain. Templates are not persisted — `PlanState` stores only a `planID` — so dropping
+/// the field costs no migration.
 public struct PlanTemplate: Codable, Hashable, Sendable, Identifiable {
     public var id: String
     public var name: String
@@ -45,7 +50,6 @@ public struct PlanTemplate: Codable, Hashable, Sendable, Identifiable {
     public var sessionsPerBlock: Int
     /// How many days a week the plan trains, used only to describe it in the picker.
     public var sessionsPerWeek: Int
-    public var isPro: Bool
 
     public init(
         id: String,
@@ -53,8 +57,7 @@ public struct PlanTemplate: Codable, Hashable, Sendable, Identifiable {
         summary: String,
         kind: PlanKind,
         sessionsPerBlock: Int,
-        sessionsPerWeek: Int,
-        isPro: Bool
+        sessionsPerWeek: Int
     ) {
         self.id = id
         self.name = name
@@ -62,7 +65,6 @@ public struct PlanTemplate: Codable, Hashable, Sendable, Identifiable {
         self.kind = kind
         self.sessionsPerBlock = sessionsPerBlock
         self.sessionsPerWeek = sessionsPerWeek
-        self.isPro = isPro
     }
 }
 

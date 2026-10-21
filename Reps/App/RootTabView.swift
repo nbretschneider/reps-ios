@@ -31,7 +31,6 @@ struct RootTabView: View {
                 }
             }
         }
-        .sheet(isPresented: $router.showPaywall) { PaywallView() }
         .onOpenURL(perform: handle)
     }
 

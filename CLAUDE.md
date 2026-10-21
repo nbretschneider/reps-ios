@@ -2,7 +2,7 @@
 
 Native SwiftUI iOS app for push-ups. The phone lies flat on the floor under your chest and
 counts reps from your face descending onto it. **Fully local** — no backend, no accounts,
-no network calls except StoreKit.
+no network calls, and nothing to buy.
 
 > Repo: `nbretschneider/reps-ios`.
 >
@@ -309,82 +309,45 @@ calendar month has to mean per calendar day or the label is a lie.
   manifest.
 - No em dashes in customer-facing copy.
 
-## Monetization
+## It is free
 
-StoreKit 2 in `Reps/Stores/PurchaseStore.swift`. No receipt server, no third-party SDK, no
-analytics, and no network code anywhere else in the app.
+**No in-app purchases, no subscription, no StoreKit, no paywall.** Every plan, every
+counting engine, the full history, the depth analytics, widgets, Health sync and CSV
+export: all of it, to everyone, with no account.
 
-Free forever: counting on every engine, unlimited free sets (labelled "Open set" in the
-UI, because "free" next to a paywall reads as pricing), **the adaptive plan** (at any
-set count), the daily-goal plan, the streak, and the last 30 days of stats. Pro: the
-published programs, full history and charts, depth history, widgets, Health sync, CSV
-export.
+This replaced a three-tier subscription that was fully built. It was removed because the
+machinery cost more than it could ever have earned on a first app with no audience, and
+because it is most of what makes a release hard: a paid app needs the **Paid Applications
+agreement** active before products load *even in sandbox*, three product listings, a
+review screenshot on each, and the app and its products submitted together or the products
+wait for review forever. A free app with no IAP needs none of that.
 
-"Counting on every engine" was always the stated rule, but `PlacementSheet` gated the depth
-engine behind Pro anyway, and the doc lost. Now that depth is the engine that actually
-counts, that gate would have been a paywall in front of the product, so it is gone. What
-Pro sells on top of depth counting is the *history* of the depth scores, not the ability to
-measure them.
+What that removed, so nobody puts it back by halves:
 
-That line is where the depth analytics sit. The **post-session histogram is free** — it is
-the session you just did, like the average depth beside it has always been. The **Depth card
-on the Profile tab is Pro**, because it is thirty days of history. Its locked state says so
-in as many words ("Counting your depth is free. Keeping its history is part of Pro."), since
-an upsell that implies the measuring is paid is a lie about the product. The card is hidden
-entirely when no set has ever been measured: a padlock over an empty chart advertises
-something the user cannot use.
+- `PurchaseStore.swift`, `PaywallView.swift` and `Reps.storekit` are deleted, and
+  `storeKitConfiguration` is gone from the scheme's run action.
+- `PlanTemplate` has no `isPro`. Templates are not persisted — `PlanState` stores only a
+  `planID` — so the field could just go.
+- `TabRouter` has no `showPaywall`, Settings has no subscription section, Profile has no
+  upgrade card and no locked states, and the plan picker has no padlocks.
+- Preflight greps for `PurchaseStore`, `PaywallView` and `import StoreKit` and **fails** if
+  any come back, because a stray paywall silently changes what the submission needs.
 
-Both daily-goal modes are free, including the climb, for the same reason the adaptive plan
-is. The set-count control and the goal control are never gated.
+The one claim worth keeping honest: the app makes **no network calls at all** now. It used
+to say "none except StoreKit".
 
-The adaptive plan is free on purpose. It is the daily loop, and a subscription in front of
-the daily loop gates the habit the subscription depends on. The set-count control is never
-gated either — it exists so people who are short on time still train.
-
-The paywall is **always dismissible** and appears once after onboarding. A push-up app earns
-a subscription by being used every day for a month, not by holding the first set hostage.
-
-### Testing purchases
-
-`Reps.storekit` defines the three products locally and is wired into the **Run** action of
-the scheme (`storeKitConfiguration` in `project.yml`). It is not a member of any target and
-never ships; archive builds talk to the real App Store.
-
-That means the paywall works in the simulator with nothing in App Store Connect: buy, and
-`Transaction.currentEntitlements` reports Pro immediately. There is no receipt server to
-agree with, because there isn't one.
-
-Resetting between runs is **Xcode ▸ Debug ▸ StoreKit ▸ Manage Transactions**, which is also
-where you delete a purchase to see the paywall again. The Editor menu on the `.storekit`
-file has the subscription-speed override, so a year passes in a few seconds and renewal and
-expiry are testable. `settings._storeKitErrors` in the file can force load and purchase
-failures — worth turning on once to see that the paywall's "Pricing is unavailable" and
-error states actually render.
-
-Three IDs have to agree or the paywall silently shows nothing: `PurchaseStore.productIDs`,
-`Reps.storekit`, and App Store Connect. `PurchaseStore` reads display names and prices off
-the `Product` rather than hardcoding them, so whatever is typed into App Store Connect is
-what the user sees — the local file's names are only for local runs.
-
-Order of operations for a real release: local `.storekit` first, then create the same three
-product IDs in App Store Connect under a subscription group named `Reps Pro`, then test in
-TestFlight with a sandbox account.
-
-**Prices, the trial length and the full App Store Connect walkthrough live in
-`AppStore/metadata.md`** — including the two steps that block a first paid release without
-saying so: the Paid Applications agreement has to be Active before products load *even in
-sandbox*, and the Small Business Program (30% → 15% commission) has to be applied for.
-A price can always be lowered later; raising one on existing subscribers needs each of them
-to opt in, so the launch price is effectively permanent for early sign-ups.
+Going paid later is possible but is not a code change you make casually: anything free
+today that goes behind a paywall tomorrow takes it away from everyone already using it.
+Adding a *new* paid feature is the honest version of that.
 
 ## Releasing to TestFlight
 
     ./scripts/preflight.sh
 
-Clean `main` → pull → package tests → app-group consistency grep → regenerate → icon alpha
-check → simulator tests → unsigned Release/device build → inspect the built bundle → bump
-the build number. Then commit the bump and, in Xcode, Product ▸ Archive ▸ Distribute App.
-`--skip-release` skips the slow device compile.
+Clean `main` → pull → package tests → app-group consistency grep → no-purchase-machinery
+grep → regenerate → icon alpha check → simulator tests → unsigned Release/device build →
+inspect the built bundle → bump the build number. Then commit the bump and, in Xcode,
+Product ▸ Archive ▸ Distribute App. `--skip-release` skips the slow device compile.
 
 **Shipping HealthKit needs more than the entitlement**: enable the HealthKit capability on
 the App ID in the developer portal, or signing fails.

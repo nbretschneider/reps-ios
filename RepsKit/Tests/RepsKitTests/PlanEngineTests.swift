@@ -408,15 +408,14 @@ struct PlanCatalogTests {
         #expect(second.reduce(0, +) > first.reduce(0, +))
     }
 
-    @Test("The default plan is free; the published programs are not")
-    func adaptiveAndDailyGoalAreFree() {
-        // The daily loop has to be free or the subscription has no habit to attach to.
-        // That covers both one-number-a-day plans: a goal you set and a goal that climbs
-        // are the same loop with different arithmetic, and gating either would put a
-        // paywall in front of the habit the subscription depends on.
-        let free = Set(PlanCatalog.all.filter { !$0.isPro }.map(\.id))
-        #expect(free == [PlanCatalog.adaptiveID, PlanCatalog.dailyGoalID, PlanCatalog.climbID])
-        #expect(PlanCatalog.all.filter { $0.isPro }.map(\.id).sorted() == ["hundred", "pyramid"])
+    @Test("Every plan in the catalog is available to everyone")
+    func everyPlanIsFree() {
+        // The app has no in-app purchases at all, so there is no flag to gate a plan on
+        // and nothing for the picker to lock. `PlanTemplate` lost its `isPro` entirely;
+        // this asserts the catalog still offers the full set rather than having quietly
+        // dropped the programs that used to be behind the paywall.
+        #expect(PlanCatalog.all.map(\.id).sorted()
+                == ["adaptive", "climb", "daily-goal", "hundred", "pyramid"])
     }
 
     @Test("Every plan in the catalog produces a session someone can do")

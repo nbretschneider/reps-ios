@@ -9,7 +9,6 @@ import RepsKit
 /// the tabs in; there is no separate "dismissed" flag to get out of sync.
 struct OnboardingFlow: View {
     @Environment(RepsStore.self) private var store
-    @Environment(TabRouter.self) private var router
 
     @State private var page = 0
     @State private var maxText = ""
@@ -198,8 +197,5 @@ struct OnboardingFlow: View {
             startedOn: store.today
         ))
         store.completeOnboarding()
-        // The paywall lands after setup, not before it: a user who has already told the
-        // app their max has something to lose by leaving.
-        router.showPaywall = true
     }
 }

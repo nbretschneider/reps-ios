@@ -22,11 +22,7 @@ public enum PlanCatalog {
             summary: "Built from your max. Steps up when you finish, backs off when you don't.",
             kind: .adaptive,
             sessionsPerBlock: 30,
-            sessionsPerWeek: 3,
-            // Free. This is the app's default plan and the whole daily loop; putting a
-            // paywall in front of it would gate the habit the subscription depends on.
-            // Pro is the published programs, the full history, and the extras.
-            isPro: false
+            sessionsPerWeek: 3
         ),
         PlanTemplate(
             id: "hundred",
@@ -34,8 +30,7 @@ public enum PlanCatalog {
             summary: "The classic six-week table. Same sets for everyone, no scaling.",
             kind: .table,
             sessionsPerBlock: 18,
-            sessionsPerWeek: 3,
-            isPro: true
+            sessionsPerWeek: 3
         ),
         PlanTemplate(
             id: "pyramid",
@@ -43,8 +38,7 @@ public enum PlanCatalog {
             summary: "Up to the top rung and back down. One rung higher every session.",
             kind: .pyramid,
             sessionsPerBlock: 24,
-            sessionsPerWeek: 4,
-            isPro: true
+            sessionsPerWeek: 4
         ),
         PlanTemplate(
             id: dailyGoalID,
@@ -52,8 +46,7 @@ public enum PlanCatalog {
             summary: "One number a day, split however you like. No prescribed sets.",
             kind: .dailyGoal,
             sessionsPerBlock: 0,
-            sessionsPerWeek: 7,
-            isPro: false
+            sessionsPerWeek: 7
         ),
         PlanTemplate(
             id: climbID,
@@ -61,11 +54,7 @@ public enum PlanCatalog {
             summary: "Start where you are. Every day you hit the number, tomorrow goes up.",
             kind: .climb,
             sessionsPerBlock: 0,
-            sessionsPerWeek: 7,
-            // Free, for the same reason the adaptive plan is: this is the daily loop, and
-            // a subscription in front of the daily loop gates the habit the subscription
-            // depends on.
-            isPro: false
+            sessionsPerWeek: 7
         )
     ]
 
