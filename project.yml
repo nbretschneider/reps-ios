@@ -56,6 +56,11 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.gradedays.reps
         INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleDefault
+        # Set here as well as in the project-wide block. XcodeGen gives every iOS app
+        # target its own default of "1,2", which beats the project-level value, so the
+        # app shipped declaring iPad support and App Store Connect demanded iPad
+        # screenshots. The project-level setting alone does nothing.
+        TARGETED_DEVICE_FAMILY: "1"
     info:
       path: Reps/Info.plist
       properties:
@@ -122,6 +127,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.gradedays.reps.widget
+        TARGETED_DEVICE_FAMILY: "1"
     info:
       path: RepsWidget/Info.plist
       properties:

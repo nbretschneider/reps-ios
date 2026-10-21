@@ -139,6 +139,14 @@ if [[ "$SKIP_RELEASE" -eq 0 ]]; then
         fail "portrait-only bundle without UIRequiresFullScreen; the upload will be rejected (90474)"
     fi
 
+    # The app is iPhone-only. If the bundle declares iPad (UIDeviceFamily containing 2),
+    # App Store Connect demands 13-inch iPad screenshots for an app that has no iPad
+    # layout. XcodeGen's per-target default of "1,2" overrides the project-wide setting,
+    # so this is checked on the built bundle rather than trusted from project.yml.
+    if /usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily' "$APP/Info.plist" 2>/dev/null | grep -q '2'; then
+        fail "the built app declares iPad (UIDeviceFamily has 2); set TARGETED_DEVICE_FAMILY to 1 on the target"
+    fi
+
     echo "bundle looks right: $(basename "$APP") + $(basename "$APPEX")"
 else
     step "Release build (skipped)"
