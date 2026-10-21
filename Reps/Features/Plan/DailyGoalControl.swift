@@ -90,7 +90,11 @@ struct DailyGoalControl: View {
                         commitTyped()
                     }
 
-                Text(isClimbing ? "STARTING GOAL" : "DAILY GOAL")
+                // "Today's", not "starting": the number shown while climbing is the goal
+                // for today, derived from the whole history. Labelling it as the start was
+                // wrong by a month of steps for anyone mid-climb, even though editing it
+                // does re-anchor the climb to today.
+                Text(isClimbing ? "TODAY'S GOAL" : "DAILY GOAL")
                     .font(RTheme.font(size: 11, weight: .bold))
                     .kerning(1)
                     .foregroundStyle(Color.rMutedForeground)

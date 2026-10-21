@@ -402,6 +402,254 @@ def screen_session() -> str:
 </div>"""
 
 
+def screen_finished() -> str:
+    """The moment the target is reached and the set keeps running.
+
+    The product decision this frame exists to show: reaching your number does not end the
+    set. The count flips from counting down to counting up, and the accent ring is the
+    burst that fires once behind it.
+    """
+    return f"""
+<div class="screen" style="background:linear-gradient(180deg,{T['gradTop']},{T['gradBottom']});">
+  <div class="statusbar" style="color:#fff;"><span>9:41</span><span>LTE</span></div>
+  <div class="notch"></div>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;
+              justify-content:center;color:#fff;">
+    <div style="font-size:20px;font-weight:700;letter-spacing:1.5px;
+                color:{T['accent']};">FINISHED</div>
+    <div style="position:relative;display:flex;align-items:center;justify-content:center;">
+      <!-- The one-shot burst, caught mid-expansion. A soft glow rather than a stroked
+           ring: a hard circle at this size cuts straight through the labels above and
+           below it and reads as a rendering fault rather than a celebration. -->
+      <div style="position:absolute;width:320px;height:320px;border-radius:999px;
+                  background:radial-gradient(circle,
+                      rgba(74,222,150,.34) 0%, rgba(74,222,150,.12) 52%,
+                      rgba(74,222,150,0) 70%);"></div>
+      <div style="position:relative;font-size:150px;font-weight:700;line-height:1;
+                  color:{T['accent']};">55</div>
+    </div>
+    <div style="font-size:20px;font-weight:700;letter-spacing:1.5px;
+                color:rgba(255,255,255,.72);">PUSH-UPS</div>
+    <div style="margin-top:16px;background:rgba(0,0,0,.28);border-radius:999px;
+                padding:9px 16px;font-size:13px;font-weight:500;">
+      Target hit. 7 past it.</div>
+  </div>
+  <div style="display:flex;justify-content:center;margin-bottom:20px;">
+    <div style="background:rgba(0,0,0,.28);border-radius:999px;padding:10px 16px;
+                color:#fff;font-size:13px;font-weight:700;display:flex;gap:14px;">
+      <span>55 done</span><span>48 target</span><span>26 cm</span>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:center;align-items:center;gap:32px;
+              margin-bottom:64px;">
+    <div style="width:52px;height:52px;border-radius:999px;background:rgba(0,0,0,.28);
+                display:flex;align-items:center;justify-content:center;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff">
+        <path d="M4 9v6h4l5 4V5L8 9H4z"/>
+        <path d="M16.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="#fff" stroke-width="2"
+              stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div style="width:78px;height:78px;border-radius:999px;background:rgba(0,0,0,.35);
+                display:flex;align-items:center;justify-content:center;">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 21V4"/><path d="M5 5h13l-2.5 4L18 13H5z" fill="#fff" stroke="none"/>
+        <path d="M5 5h13l-2.5 4L18 13H5z"/>
+      </svg>
+    </div>
+    <div style="width:52px;height:52px;border-radius:999px;background:rgba(0,0,0,.28);
+                display:flex;align-items:center;justify-content:center;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff"
+           stroke-width="2.4" stroke-linecap="round">
+        <path d="M6 6l12 12M18 6L6 18"/>
+      </svg>
+    </div>
+  </div>
+</div>"""
+
+
+# A believable session: 55 reps around 27 cm, shallower at the end because that is what
+# fatigue does. Bins are 5 cm wide and anchored to the data, exactly as
+# `DepthStats.histogram` anchors them, so the axis runs 15 to 35 rather than 0 to 100.
+DEPTH_BINS = [(15, 20, 1), (20, 25, 9), (25, 30, 33), (30, 35, 12)]
+DEPTH_MEDIAN_CM = 27
+
+
+def depth_histogram(bins, tint: str, label: str, height: int = 92) -> str:
+    """`DepthHistogram`, drawn the way the app draws it: counts above, ends labelled."""
+    peak = max(count for _, _, count in bins) or 1
+    columns = "".join(
+        f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;'
+        f'justify-content:flex-end;">'
+        f'<div style="font-size:10px;font-weight:700;color:{label};">'
+        f'{count if count else "&nbsp;"}</div>'
+        f'<div style="width:100%;border-radius:3px;'
+        f'height:{max(6, round(height * count / peak)) if count else 3}px;'
+        f'background:{tint if count else tint + "24"};"></div></div>'
+        for _, _, count in bins
+    )
+    return f"""
+    <div style="display:flex;gap:4px;align-items:flex-end;height:{height + 16}px;">
+      {columns}
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:4px;
+                font-size:10px;color:{label};">
+      <span>{bins[0][0]} cm</span><span>{bins[-1][1]} cm</span>
+    </div>"""
+
+
+def screen_depth() -> str:
+    """The post-session summary, with the depth distribution.
+
+    Free, deliberately: this is the session you just did. What Pro sells is the history of
+    these scores, not the ability to measure them.
+    """
+    return f"""
+<div class="screen" style="background:linear-gradient(180deg,{T['gradTop']},{T['gradBottom']});">
+  <div class="statusbar" style="color:#fff;"><span>9:41</span><span>LTE</span></div>
+  <div class="notch"></div>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;
+              justify-content:center;color:#fff;padding:0 28px;">
+    <svg width="52" height="52" viewBox="0 0 24 24" fill="#fff">
+      <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 14.5-4-4 1.5-1.5 2.5 2.5
+               5-5L17.5 10z"/>
+    </svg>
+    <div style="font-size:84px;font-weight:700;line-height:1.05;margin-top:6px;">55</div>
+    <div style="font-size:20px;font-weight:700;letter-spacing:1.5px;
+                color:rgba(255,255,255,.72);">PUSH-UPS</div>
+
+    <!-- Sits in its own panel rather than loose on the gradient. At this size a bare
+         chart on a coloured field reads as four stray rectangles; a container makes it
+         a chart. -->
+    <div style="width:100%;margin-top:30px;background:rgba(0,0,0,.20);
+                border-radius:18px;padding:18px;">
+      <div style="display:flex;align-items:baseline;gap:8px;">
+        <div style="font-size:36px;font-weight:700;line-height:1;">{DEPTH_MEDIAN_CM}</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.72);">cm median</div>
+        <div style="margin-left:auto;font-size:13px;font-weight:700;color:{T['accent']};">
+          &#8599; 2 cm vs last week</div>
+      </div>
+      <div style="margin-top:16px;">
+        {depth_histogram(DEPTH_BINS, "#ffffff", "rgba(255,255,255,.78)", height=118)}
+      </div>
+    </div>
+    <div style="font-size:12px;color:rgba(255,255,255,.72);margin-top:14px;
+                text-align:center;">
+      82% of full extension &middot; 55 reps measured</div>
+  </div>
+  <div style="padding:0 56px 64px;">
+    <div style="background:#fff;color:{T['gradBottom']};border-radius:999px;
+                text-align:center;padding:16px;font-size:17px;font-weight:600;">DONE</div>
+  </div>
+</div>"""
+
+
+def settings_row(title: str, value: str, divider: bool = False) -> str:
+    """A disclosure row, the way `PlanView.row` draws one."""
+    border = f"border-top:1px solid {T['border']};" if divider else ""
+    return f"""
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:16px;{border}">
+      <div style="font-size:15px;">{title}</div>
+      <div style="display:flex;align-items:center;gap:8px;color:{T['mutedFg']};">
+        <span style="font-size:15px;">{value}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+             stroke="{T['mutedFg']}" stroke-width="3" stroke-linecap="round"
+             stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+    </div>"""
+
+
+def screen_goal() -> str:
+    """The Plan tab's goal control: one number a day, fixed or climbing.
+
+    The control that replaced a goal nobody could change. `dailyGoal` was hardcoded to 100
+    with no editor anywhere in the app, so the one plan built around picking your number
+    shipped with the number fixed.
+    """
+    modes = [("Fixed", "The same number every day", False),
+             ("Climbing", "Goes up when you hit it", True)]
+    toggle = "".join(
+        f'<div style="flex:1;padding:12px;border-radius:12px;'
+        f'background:{T["primary"] if on else T["muted"]};'
+        f'color:{"#fff" if on else T["mutedFg"]};">'
+        f'<div style="font-size:15px;font-weight:700;">{name}</div>'
+        f'<div style="font-size:13px;opacity:.8;">{detail}</div></div>'
+        for name, detail, on in modes
+    )
+
+    def nudge(symbol: str) -> str:
+        path = ("M5 12h14" if symbol == "minus" else "M12 5v14M5 12h14")
+        return (f'<div style="width:48px;height:48px;border-radius:999px;'
+                f'background:{T["muted"]};display:flex;align-items:center;'
+                f'justify-content:center;flex:0 0 48px;">'
+                f'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" '
+                f'stroke="{T["primary"]}" stroke-width="2.6" stroke-linecap="round">'
+                f'<path d="{path}"/></svg></div>')
+
+    def stepper(label: str) -> str:
+        return f"""
+        <div style="display:flex;align-items:center;justify-content:space-between;
+                    padding:10px 0;">
+          <div style="font-size:15px;">{label}</div>
+          <div style="display:flex;gap:2px;background:{T['muted']};border-radius:8px;
+                      padding:2px 4px;">
+            <span style="color:{T['primary']};font-size:17px;font-weight:700;
+                         padding:0 8px;">&#8722;</span>
+            <span style="color:{T['border']};">|</span>
+            <span style="color:{T['primary']};font-size:17px;font-weight:700;
+                         padding:0 8px;">+</span>
+          </div>
+        </div>"""
+
+    inner = f"""
+<div class="body">
+  <div class="title">Plan</div>
+  <div class="card">
+    <div class="row">
+      {ring(40/48, 96, f'''
+        <div style="font-size:26px;font-weight:700;">40</div>''',
+        color=T['primary'])}
+      <div>
+        <div style="font-size:20px;font-weight:700;">Climb</div>
+        <div class="cap" style="margin-top:2px;">Start where you are. Every day you hit
+          the number, tomorrow goes up.</div>
+        <div style="font-size:13px;font-weight:700;color:{T['primary']};margin-top:8px;">
+          Today: 48</div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="hdr">Daily goal</div>
+    <div style="display:flex;gap:8px;">{toggle}</div>
+    <div style="display:flex;align-items:center;gap:16px;margin-top:18px;">
+      {nudge("minus")}
+      <div style="flex:1;text-align:center;">
+        <div style="font-size:44px;font-weight:700;line-height:1;">48</div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;
+                    color:{T['mutedFg']};margin-top:2px;">TODAY'S GOAL</div>
+      </div>
+      {nudge("plus")}
+    </div>
+    <div style="margin-top:10px;">
+      {stepper("Step up by 2 a day")}
+      {stepper("Stop at 100")}
+    </div>
+    <div class="cap" style="margin-top:6px;">
+      Hit 48 today and tomorrow asks for 50. Miss it once and it holds. A day you skip
+      counts as neither.</div>
+  </div>
+  <!-- The settings rows the real tab carries below the goal. Without them the screen
+       ends halfway down and reads as an unfinished mockup rather than a tab. -->
+  <div class="card flush">
+    {settings_row("Training days", "Every day")}
+    {settings_row("Switch plan", "Climb", divider=True)}
+  </div>
+</div>"""
+    return chrome(inner, tab="Plan")
+
+
 def screen_train() -> str:
     inner = f"""
 <div class="body">
@@ -672,13 +920,19 @@ def screen_records() -> str:
     return chrome(inner, tab="Profile")
 
 
+# Order is the store listing's order, and the first three are what shows in search before
+# anyone swipes: it counts, it does not stop you, and you pick the number. The two frames
+# that sell the new work sit at 2 and 4 rather than at the end for that reason.
 FRAMES = [
     ("01-session", screen_session, "It counts every rep", "Phone on the floor. Lower, push, counted."),
-    ("02-train", screen_train, "One set. Two minutes.", "Not fifteen. That's why you'll actually do it."),
-    ("03-plan", screen_plan, "Got more time today?", "Multiple sets is one tap, whenever you want it."),
-    ("04-profile", screen_profile, "Every number you've put in", "A month at a glance."),
-    ("05-placement", screen_placement, "No watch, no wearables", "The camera that unlocks your iPhone does it."),
-    ("06-records", screen_records, "Streaks that survive real life", "Rest days don't break them."),
+    ("02-finished", screen_finished, "Hit your number, keep going", "Reaching the target doesn't end your set."),
+    ("03-goal", screen_goal, "Pick your number, or climb", "Fifty every day, or two more each day you hit it."),
+    ("04-train", screen_train, "One set. Two minutes.", "Not fifteen. That's why you'll actually do it."),
+    ("05-depth", screen_depth, "How deep you actually go", "Every rep measured, in centimetres."),
+    ("06-plan", screen_plan, "Got more time today?", "Multiple sets is one tap, whenever you want it."),
+    ("07-profile", screen_profile, "Every number you've put in", "A month at a glance."),
+    ("08-placement", screen_placement, "No watch, no wearables", "The camera that unlocks your iPhone does it."),
+    ("09-records", screen_records, "Streaks that survive real life", "Rest days don't break them."),
 ]
 
 
