@@ -75,7 +75,17 @@ CHROME = ""   # resolved in main(), so importing this module never probes the fi
 CANVAS_W, CANVAS_H = 440, 956
 
 # Both slots App Store Connect actually requires.
-SLOTS = {"6.9": (1320, 2868), "6.5": (1284, 2778)}
+SLOTS = {
+    "6.9": (1320, 2868),
+    "6.5": (1284, 2778),
+    # The new App Store Connect UI groups slots by device ("iPhone with Dynamic Island,
+    # medium display") rather than by diagonal, and a medium display takes the 6.1" and
+    # 6.3" sizes. A 6.9" frame dropped there is rejected as "file dimensions are invalid",
+    # which reads like a corrupt upload and is not one.
+    "6.7": (1290, 2796),
+    "6.3": (1206, 2622),
+    "6.1": (1179, 2556),
+}
 
 
 def hsl(h: float, s: float, lightness: float) -> str:
