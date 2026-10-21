@@ -87,7 +87,10 @@ before you start. Two to five sets, whenever you have the time for it.
 Prefer a published program? The classic six week hundred push-up table and the prison
 ladder are both here, reproduced exactly as written.
 
-Prefer nothing at all? Set a number for the day and split it however you like.
+Prefer nothing at all? Set a number for the day and split it however you like. Or let it
+climb: pick where you start, and every day you hit the number, tomorrow goes up by two.
+Miss a day and it holds. Skip a day entirely and nothing moves. It stops at a ceiling you
+choose, so it never runs away from you.
 
 A STREAK THAT SURVIVES REAL LIFE
 
