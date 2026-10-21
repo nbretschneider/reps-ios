@@ -111,6 +111,39 @@ struct DateCodingTests {
         let decoded = try StoredDate.makeDecoder().decode(PersistedState.self, from: data)
         #expect(decoded == state)
     }
+
+    @Test("Per-rep depth survives a round trip, rep for rep")
+    func repTravelsRoundTrip() throws {
+        // The histogram is drawn straight off this array, so an encoder that reordered or
+        // rounded it would show the user a distribution that never happened.
+        let travels = [0.281, 0.274, 0.2695, 0.31, 0.226]
+        var state = PersistedState()
+        state.workouts = [Workout(
+            dayKey: "2026-08-14",
+            startedAt: Date(timeIntervalSinceReferenceDate: 1.5),
+            sets: [CompletedSet(target: 30, completed: 5,
+                                startedAt: Date(timeIntervalSinceReferenceDate: 1.5),
+                                averageTravel: 0.272, repTravels: travels, engine: .depth)]
+        )]
+
+        let data = try StoredDate.makeEncoder().encode(state)
+        let decoded = try StoredDate.makeDecoder().decode(PersistedState.self, from: data)
+        #expect(decoded == state)
+        #expect(decoded.workouts.first?.sets.first?.repTravels == travels)
+    }
+
+    @Test("A climb plan's step and ceiling survive a round trip")
+    func climbSettingsRoundTrip() throws {
+        var state = PersistedState()
+        state.plan = PlanState(planID: PlanCatalog.climbID, baseMax: 40, startedOn: "2026-09-01",
+                               dailyGoal: 40, climbStep: 3, climbCeiling: 75)
+
+        let data = try StoredDate.makeEncoder().encode(state)
+        let decoded = try StoredDate.makeDecoder().decode(PersistedState.self, from: data)
+        #expect(decoded == state)
+        #expect(decoded.plan?.climbStep == 3)
+        #expect(decoded.plan?.climbCeiling == 75)
+    }
 }
 
 @Suite("Schema tolerance")
@@ -125,6 +158,25 @@ struct SchemaToleranceTests {
         #expect(state.plan == nil)
         #expect(state.settings == Preferences())      // defaults, not a crash
         #expect(state.isFirstRun)
+    }
+
+    @Test("A set recorded before per-rep depth existed still decodes")
+    func missingRepTravelsDecode() throws {
+        // Every set already on a user's phone looks like this. Nil has to mean "not
+        // measured" and render as nothing, never as an empty distribution or 0 cm.
+        let json = """
+        {"schemaVersion":1,"restDays":[],"maxTests":[],"workouts":[
+          {"id":"5E7E1E90-0000-4000-8000-000000000001","dayKey":"2026-08-14",
+           "startedAt":0,"sets":[
+             {"id":"5E7E1E90-0000-4000-8000-000000000002","target":30,"completed":30,
+              "startedAt":0,"duration":60,"restAfter":0,"averageDepth":0.82,
+              "engine":"depth"}]}]}
+        """
+        let state = try StoredDate.makeDecoder().decode(PersistedState.self, from: Data(json.utf8))
+        let set = try #require(state.workouts.first?.sets.first)
+        #expect(set.repTravels == nil)
+        #expect(set.averageDepth == 0.82)
+        #expect(state.workouts.first?.repTravels.isEmpty == true)
     }
 
     @Test("Onboarding completion is remembered independently of having a plan")

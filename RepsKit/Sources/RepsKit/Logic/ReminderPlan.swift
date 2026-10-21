@@ -31,20 +31,32 @@ public enum ReminderPlan {
             trainedDays: trained, restDays: state.restDays, today: today, calendar: calendar
         )
 
-        if template.kind == .dailyGoal {
+        if template.kind.isDailyNumber {
+            // A climb's goal differs per day, so it is resolved per day rather than read
+            // once off the plan. That works for the future days in the horizon too: the
+            // derivation only scores days that have reps on them, so tomorrow's goal is
+            // today's until today is actually finished, at which point it steps.
+            let repsByDay = Stats.repsByDay(state.workouts)
+            let goalOn: (String) -> Int = { key in
+                template.kind == .climb
+                    ? PlanEngine.climbGoal(for: plan, on: key, repsByDay: repsByDay, calendar: calendar)
+                    : plan.dailyGoal
+            }
+
             return DayKey.range(
                 from: today,
                 through: DayKey.adding(horizon - 1, to: today, calendar: calendar) ?? today,
                 calendar: calendar
             )
             .filter { !state.restDays.contains($0) }
-            .filter { state.reps(on: $0) < plan.dailyGoal }
+            .filter { state.reps(on: $0) < goalOn($0) }
             .map { key in
-                Day(
+                let goal = goalOn(key)
+                return Day(
                     dayKey: key,
                     title: key == today && state.reps(on: key) > 0
-                        ? "\(plan.dailyGoal - state.reps(on: key)) to go"
-                        : "\(plan.dailyGoal) push-ups",
+                        ? "\(goal - state.reps(on: key)) to go"
+                        : "\(goal) push-ups",
                     body: streakLine(streak) ?? "Two minutes on the floor and it's done."
                 )
             }

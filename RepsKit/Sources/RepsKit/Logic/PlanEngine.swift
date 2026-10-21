@@ -5,6 +5,15 @@ import Foundation
 public enum PlanCatalog {
     public static let adaptiveID = "adaptive"
     public static let dailyGoalID = "daily-goal"
+    public static let climbID = "climb"
+
+    /// The two plans that are one number a day rather than a prescribed session. The goal
+    /// editor offers these as a toggle, so it needs to know which is which without
+    /// hardcoding ids at the call site.
+    public static func isDailyNumber(_ id: String) -> Bool {
+        let kind = templateOrDefault(id).kind
+        return kind.isDailyNumber
+    }
 
     public static let all: [PlanTemplate] = [
         PlanTemplate(
@@ -44,6 +53,18 @@ public enum PlanCatalog {
             kind: .dailyGoal,
             sessionsPerBlock: 0,
             sessionsPerWeek: 7,
+            isPro: false
+        ),
+        PlanTemplate(
+            id: climbID,
+            name: "Climb",
+            summary: "Start where you are. Every day you hit the number, tomorrow goes up.",
+            kind: .climb,
+            sessionsPerBlock: 0,
+            sessionsPerWeek: 7,
+            // Free, for the same reason the adaptive plan is: this is the daily loop, and
+            // a subscription in front of the daily loop gates the habit the subscription
+            // depends on.
             isPro: false
         )
     ]
@@ -152,16 +173,138 @@ public enum PlanEngine {
             let top = base + max(0, sessionIndex)
             return Array(1...top) + Array((1..<top).reversed())
 
-        case .dailyGoal:
+        case .dailyGoal, .climb:
             return []
         }
     }
 
     /// Total reps prescribed for a session.
+    ///
+    /// For `.climb` this is the number the climb *started* at, not today's goal: today's
+    /// depends on the whole history and comes from `climbGoal(for:on:repsByDay:)`. Nothing
+    /// in the app reads this for a climb plan — `RepsStore.goalToday` is the single
+    /// resolution point — and a caller that needs a live number should go there.
     public static func total(for state: PlanState, sessionIndex: Int) -> Int {
         let template = PlanCatalog.templateOrDefault(state.planID)
-        if template.kind == .dailyGoal { return state.dailyGoal }
+        if template.kind.isDailyNumber { return state.dailyGoal }
         return sets(for: state, sessionIndex: sessionIndex).reduce(0, +)
+    }
+
+    // MARK: - Climb
+
+    /// How far back the climb is reconstructed. Two years of daily stepping saturates at
+    /// any sane ceiling long before this, so the bound costs nothing and stops a corrupt
+    /// `startedOn` from walking the calendar forever.
+    static let climbLookbackDays = 730
+
+    /// Today's goal for a `.climb` plan, derived from scratch every time it is read.
+    ///
+    /// Nothing about the climb is stored except where it began, how big a step is, and
+    /// where it stops. The current goal is a pure function of those three and the days
+    /// since — which is the same reason the Plan tab's schedule is recomputed on every
+    /// render: a derived number cannot go stale, and it cannot double-count.
+    ///
+    /// That last part is the real reason it works this way. Progression that mutates state
+    /// has to fire exactly once per day, and the persistence design re-applies envelopes
+    /// after a crash. A plan that stepped on every `advance` would step twice for two
+    /// sessions in one day, and again on a replay. Deriving sidesteps the whole class of
+    /// bug: `advance` does nothing at all for a climb, so there is nothing to replay.
+    ///
+    /// The rules, in order:
+    ///
+    /// - **A day you did not train does not move the goal.** Not a hit, not a miss. This is
+    ///   the same judgement the streak makes about rest days, and without it a week away
+    ///   compounds three deloads and hands back a goal 40% lower than it should be.
+    /// - **Reaching the goal steps up** by `climbStep`, never past `climbCeiling`.
+    /// - **Falling short holds.** One short day changes nothing: everybody has one.
+    /// - **Two short days in a row back the goal off 15%** and reset the count, which is the
+    ///   same deload the adaptive plan uses, for the same reason — repeating a number you
+    ///   cannot reach is a dead end.
+    public static func climbGoal(
+        for state: PlanState,
+        on dayKey: String,
+        repsByDay: [String: Int],
+        calendar: Calendar = .current
+    ) -> Int {
+        let ceiling = state.climbCeiling
+        var goal = min(max(1, state.dailyGoal), ceiling)
+
+        // The climb is evaluated on the days *before* the one being asked about: today's
+        // goal cannot depend on whether today has been finished yet.
+        guard let lastScored = DayKey.adding(-1, to: dayKey, calendar: calendar),
+              lastScored >= state.startedOn else { return goal }
+
+        let earliest = DayKey.adding(-climbLookbackDays, to: dayKey, calendar: calendar)
+        let start = max(state.startedOn, earliest ?? state.startedOn)
+        guard start <= lastScored else { return goal }
+
+        var shortDays = 0
+        for key in DayKey.range(from: start, through: lastScored, calendar: calendar) {
+            score(key, goal: &goal, shortDays: &shortDays, state: state,
+                  ceiling: ceiling, repsByDay: repsByDay)
+        }
+        return goal
+    }
+
+    /// Every day's goal across a range, in one walk.
+    ///
+    /// `climbGoal` re-derives from the start of the plan on every call, which is the right
+    /// shape for one day and quadratic for a chart. The month grid and the year chart ask
+    /// about every day at once and recompute on every render, so they get a single pass.
+    ///
+    /// Agrees with `climbGoal` day for day, which is pinned by a test: two derivations of
+    /// the same number that can disagree is worse than one slow one.
+    public static func climbGoals(
+        for state: PlanState,
+        from start: String,
+        through end: String,
+        repsByDay: [String: Int],
+        calendar: Calendar = .current
+    ) -> [String: Int] {
+        guard start <= end else { return [:] }
+        let ceiling = state.climbCeiling
+        var goal = min(max(1, state.dailyGoal), ceiling)
+
+        let earliest = DayKey.adding(-climbLookbackDays, to: end, calendar: calendar)
+        let walkStart = max(state.startedOn, earliest ?? state.startedOn)
+
+        var out: [String: Int] = [:]
+        var shortDays = 0
+        for key in DayKey.range(from: min(walkStart, start), through: end, calendar: calendar) {
+            // Recorded *before* the day is scored: a day's goal cannot depend on whether
+            // that day has been finished yet, which is the same rule `climbGoal` follows
+            // by scoring only up to the day before.
+            if key >= start { out[key] = goal }
+            guard key >= walkStart else { continue }
+            score(key, goal: &goal, shortDays: &shortDays, state: state,
+                  ceiling: ceiling, repsByDay: repsByDay)
+        }
+        return out
+    }
+
+    /// One day's effect on a running climb. Shared so the two derivations above cannot
+    /// drift apart.
+    private static func score(
+        _ key: String,
+        goal: inout Int,
+        shortDays: inout Int,
+        state: PlanState,
+        ceiling: Int,
+        repsByDay: [String: Int]
+    ) {
+        let reps = repsByDay[key] ?? 0
+        guard reps > 0 else { return }
+
+        if reps >= goal {
+            goal = min(ceiling, goal + state.climbStep)
+            shortDays = 0
+        } else {
+            shortDays += 1
+            if shortDays >= 2 {
+                shortDays = 0
+                goal = max(1, Int((Double(goal) * deloadFactor).rounded()))
+            }
+        }
     }
 
     // MARK: - Progression
@@ -178,7 +321,10 @@ public enum PlanEngine {
     public static func advance(_ state: PlanState, with workout: Workout) -> PlanState {
         var next = state
         let template = PlanCatalog.templateOrDefault(state.planID)
-        guard template.kind != .dailyGoal else { return next }
+        // Neither of the one-number-a-day plans has a session index to advance. A climb's
+        // goal is derived from history by `climbGoal`, so there is deliberately nothing to
+        // mutate here — see the note there about replay.
+        guard !template.kind.isDailyNumber else { return next }
 
         if workout.isComplete {
             next.consecutiveFailures = 0
@@ -225,7 +371,7 @@ public enum PlanEngine {
         calendar: Calendar = .current
     ) -> [ScheduledSession] {
         let template = PlanCatalog.templateOrDefault(state.planID)
-        guard count > 0, template.kind != .dailyGoal, !state.trainingWeekdays.isEmpty else { return [] }
+        guard count > 0, !template.kind.isDailyNumber, !state.trainingWeekdays.isEmpty else { return [] }
 
         var result: [ScheduledSession] = []
         var cursor = calendar.startOfDay(for: from)
@@ -273,7 +419,7 @@ public enum PlanEngine {
     /// Counting only the days a user explicitly marked would break a perfectly compliant
     /// three-days-a-week streak every single Tuesday, which is the opposite of the rule.
     ///
-    /// A `.dailyGoal` plan asks for every day, so it prescribes no rest.
+    /// A one-number-a-day plan asks for every day, so it prescribes no rest.
     public static func prescribedRestDays(
         for state: PlanState,
         from start: String,
@@ -281,7 +427,7 @@ public enum PlanEngine {
         calendar: Calendar = .current
     ) -> Set<String> {
         let template = PlanCatalog.templateOrDefault(state.planID)
-        guard template.kind != .dailyGoal, !state.trainingWeekdays.isEmpty else { return [] }
+        guard !template.kind.isDailyNumber, !state.trainingWeekdays.isEmpty else { return [] }
         return Set(
             DayKey.range(from: start, through: end, calendar: calendar).filter { key in
                 guard let weekday = DayKey.weekday(key, calendar: calendar) else { return false }
@@ -290,7 +436,7 @@ public enum PlanEngine {
         )
     }
 
-    /// Is `date` a training day for this plan? A `.dailyGoal` plan trains every day.
+    /// Is `date` a training day? A one-number-a-day plan trains every day.
     public static func isTrainingDay(
         _ state: PlanState,
         date: Date,
@@ -300,7 +446,7 @@ public enum PlanEngine {
         let key = DayKey.make(date, calendar: calendar)
         guard !restDays.contains(key) else { return false }
         let template = PlanCatalog.templateOrDefault(state.planID)
-        guard template.kind != .dailyGoal else { return true }
+        guard !template.kind.isDailyNumber else { return true }
         return state.trainingWeekdays.contains(calendar.component(.weekday, from: date))
     }
 }

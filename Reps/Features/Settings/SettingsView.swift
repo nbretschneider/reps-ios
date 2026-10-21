@@ -83,15 +83,26 @@ struct SettingsView: View {
                     }
                 }
             } else {
-                LabeledContent("Sets per session", value: "Set by the program")
+                LabeledContent("Sets per session",
+                               value: store.planIsDailyNumber ? "However you like" : "Set by the program")
             }
         } header: {
             Text("Session")
         } footer: {
-            Text(store.planHonoursSetCount
-                 ? "One set is about two minutes. Splitting it into sets adds volume and rest, and takes longer."
-                 : "A published program prescribes its own sets and runs exactly as written.")
+            // Three cases, not two. A daily number is not a published program, and telling
+            // someone their own goal "runs exactly as written" explains nothing.
+            Text(sessionFooter)
         }
+    }
+
+    private var sessionFooter: String {
+        if store.planHonoursSetCount {
+            return "One set is about two minutes. Splitting it into sets adds volume and rest, and takes longer."
+        }
+        if store.planIsDailyNumber {
+            return "One number a day, split into as many sets as you want. Change the number on the Plan tab."
+        }
+        return "A published program prescribes its own sets and runs exactly as written."
     }
 
     private var countingSection: some View {

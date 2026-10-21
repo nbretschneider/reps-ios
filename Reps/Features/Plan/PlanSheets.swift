@@ -9,8 +9,6 @@ struct PlanPickerSheet: View {
     @Environment(TabRouter.self) private var router
     @Environment(\.dismiss) private var dismiss
 
-    @State private var goalDraft = "100"
-
     var body: some View {
         NavigationStack {
             ZStack {
@@ -67,7 +65,7 @@ struct PlanPickerSheet: View {
                         .font(RTheme.body)
                         .foregroundStyle(Color.rMutedForeground)
                         .multilineTextAlignment(.leading)
-                    Text(template.kind == .dailyGoal
+                    Text(template.kind.isDailyNumber
                          ? "Every day"
                          : "\(template.sessionsPerWeek)x a week · \(template.sessionsPerBlock) sessions a block")
                         .font(RTheme.caption)
@@ -91,7 +89,14 @@ struct PlanPickerSheet: View {
             blockIndex: 0,
             trainingWeekdays: existing?.trainingWeekdays ?? defaultWeekdays(for: template),
             startedOn: store.today,
-            dailyGoal: existing?.dailyGoal ?? 100
+            // Carried across, like the anchor: someone who set their number to 50 and then
+            // tried a published program should not come back to find it reset to 100. The
+            // number was hardcoded to 100 here until the goal editor existed, which is how
+            // the daily plan shipped with a goal nobody could change.
+            dailyGoal: existing?.dailyGoal ?? 100,
+            setCount: existing?.setCount ?? PlanState.defaultSetCount,
+            climbStep: existing?.climbStep ?? PlanState.defaultClimbStep,
+            climbCeiling: existing?.climbCeiling ?? PlanState.defaultClimbCeiling
         ))
         dismiss()
     }

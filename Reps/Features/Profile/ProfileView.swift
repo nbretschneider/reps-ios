@@ -25,6 +25,7 @@ struct ProfileView: View {
                         totals
                         monthCard
                         chartCard
+                        depthCard
                         recordsCard
                         if !purchases.isPro { upgradeCard }
                     }
@@ -140,6 +141,62 @@ struct ProfileView: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 160)
+    }
+
+    /// How deep, over the last thirty days.
+    ///
+    /// Pro, deliberately and narrowly: counting depth is free on every engine and always
+    /// will be, and what Pro sells is the *history* of those scores rather than the ability
+    /// to measure them. The post-session summary shows the same chart for the session you
+    /// just did, free, for exactly that reason.
+    @ViewBuilder
+    private var depthCard: some View {
+        // Only ever drawn when there is depth history to draw. Someone who counts by
+        // tapping has none, and an empty chart with a padlock on it is an advert for
+        // something they cannot use.
+        if hasAnyDepthHistory {
+            RCard {
+                VStack(alignment: .leading, spacing: RTheme.Spacing.stack) {
+                    SectionHeader(icon: "arrow.down.to.line", title: "Depth")
+
+                    if purchases.isPro {
+                        if let summary = depthSummary {
+                            DepthVerdict(summary: summary, comparison: depthTrend)
+                            DepthHistogram(bins: DepthStats.histogram(recentTravels))
+                            Text(depthFootnote(summary))
+                                .font(RTheme.caption)
+                                .foregroundStyle(Color.rMutedForeground)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            Text("No measured reps in the last 30 days. Precision mode scores every rep it counts.")
+                                .font(RTheme.body)
+                                .foregroundStyle(Color.rMutedForeground)
+                        }
+                    } else {
+                        lockedDepth
+                    }
+                }
+            }
+        }
+    }
+
+    private var lockedDepth: some View {
+        VStack(spacing: RTheme.Spacing.stack) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 24))
+                .foregroundStyle(Color.rPrimary)
+            // Says what is locked and what is not, because the thing that measures depth
+            // is free and an upsell that implies otherwise is a lie about the product.
+            Text("Counting your depth is free. Keeping its history is part of Pro.")
+                .font(RTheme.body)
+                .foregroundStyle(Color.rMutedForeground)
+                .multilineTextAlignment(.center)
+            Button("See Pro") { router.showPaywall = true }
+                .font(RTheme.bodyMedium)
+                .tint(.rPrimary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, RTheme.Spacing.stack)
     }
 
     private var recordsCard: some View {
@@ -258,6 +315,57 @@ struct ProfileView: View {
         }
         guard let start = DayKey.adding(-days, to: store.today) else { return [] }
         return store.series(from: start, through: store.today)
+    }
+
+    // MARK: - Depth data
+
+    /// Thirty days, matching the free history window elsewhere in the app, and long enough
+    /// that a histogram has a shape rather than one session's worth of noise.
+    private static let depthWindowDays = 29
+
+    private var depthWindow: (start: String, end: String) {
+        let start = DayKey.adding(-Self.depthWindowDays, to: store.today) ?? store.today
+        return (start, store.today)
+    }
+
+    private var recentTravels: [Double] {
+        let window = depthWindow
+        return DepthStats.travels(store.state.workouts, from: window.start, through: window.end)
+    }
+
+    private var depthSummary: DepthSummary? {
+        DepthStats.summary(recentTravels)
+    }
+
+    /// Is there any per-rep depth at all, ever?
+    ///
+    /// Checked across all history rather than the window, so the card does not vanish for
+    /// someone who measured plenty last month and tapped this week. Reads the raw arrays
+    /// rather than a summary because the only question is whether any exist.
+    private var hasAnyDepthHistory: Bool {
+        store.state.workouts.contains { !$0.repTravels.isEmpty }
+    }
+
+    /// The most recent week against the three before it, so the arrow means "lately,
+    /// compared with the rest of the month" rather than comparing a window to itself.
+    private var depthTrend: DepthComparison? {
+        guard let weekStart = DayKey.adding(-6, to: store.today) else { return nil }
+        let window = depthWindow
+        let thisWeek = DepthStats.travels(store.state.workouts, from: weekStart, through: window.end)
+        guard !thisWeek.isEmpty else { return nil }
+
+        let earlier = store.state.workouts.filter { $0.dayKey < weekStart }
+        let baseline = DepthStats.travels(earlier, from: window.start, through: window.end)
+        guard let median = DepthStats.median(baseline),
+              let current = DepthStats.median(thisWeek) else { return nil }
+        return DepthComparison(current: current, baseline: median, baselineReps: baseline.count)
+    }
+
+    private func depthFootnote(_ summary: DepthSummary) -> String {
+        let shallow = Int((summary.shallowest * 100).rounded())
+        let deep = Int((summary.deepest * 100).rounded())
+        let span = shallow == deep ? "all at \(deep) cm" : "\(shallow) to \(deep) cm"
+        return "\(summary.reps) measured reps in the last 30 days, \(span). Deeper is better, and the median is the one to watch: it ignores the one rep that got away."
     }
 
     /// "31 Jul 2026" rather than the stored `2026-07-31`. Nil in, nil out: a record that

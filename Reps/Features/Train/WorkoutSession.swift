@@ -25,6 +25,13 @@ final class WorkoutSession {
     private(set) var completedSets: [CompletedSet] = []
     private(set) var phase: RepPhase = .up
     private(set) var isPaused = false
+    /// The current set has reached its prescribed number and is now running on.
+    ///
+    /// Drives the "finished, keep going" state on the session screen. Reset per set, not
+    /// per session, so set three of three does not inherit set one's celebration.
+    private(set) var hasHitTarget = false
+    /// Reps done past the target in the current set. Zero until the target is reached.
+    var repsBeyondTarget: Int { hasHitTarget ? max(0, reps - currentTarget) : 0 }
     /// Set when the chosen engine could not start, so the session screen can say why and
     /// fall back rather than silently counting nothing.
     private(set) var engineWarning: String?
@@ -144,9 +151,20 @@ final class WorkoutSession {
         if preferences.hapticsEnabled { Haptics.rep() }
         coach.rep(reps, target: currentTarget)
 
-        // A prescribed set ends itself. A free set does not — the user decides when they
-        // are done, which is the whole difference between the two.
-        if !isFreeSet, reps >= currentTarget {
+        // Crossing the target is announced once and then got out of the way of. Reaching
+        // the number you came for should feel like something, and then the set should keep
+        // counting: deciding on rep 40 to make it 50 is the best thing a user can do, and
+        // the app used to respond by ending the set under them.
+        if !isFreeSet, !hasHitTarget, reps >= currentTarget {
+            hasHitTarget = true
+            if preferences.hapticsEnabled { Haptics.celebrate() }
+            coach.targetReached(currentTarget)
+        }
+
+        // Only the *last* set runs on. An intermediate set still ends itself, because
+        // something has to start the rest timer and the alternative is reaching for the
+        // phone mid-session with your chest on the floor.
+        if !isFreeSet, !isLastSet, reps >= currentTarget {
             finishSet(completed: reps)
         }
     }
@@ -195,6 +213,7 @@ final class WorkoutSession {
         detector?.resetCount()
         coach.countdown(0)
         reps = 0
+        hasHitTarget = false
         setStartedAt = Date()
         stage = .working
     }
@@ -210,6 +229,15 @@ final class WorkoutSession {
         setStartedAt = Date()
         stage = .working
     }
+
+    /// Test seam: deliver a counted rep without a detector.
+    ///
+    /// Goes through the real `handleRep`, because the behaviour worth covering is exactly
+    /// what that function decides — whether reaching the target ends the set. A test that
+    /// called `finishSet` directly would pass no matter which way that went.
+    func registerRepForTesting(_ index: Int) {
+        handleRep(RepEvent(index: index, depth: nil))
+    }
     #endif
 
     /// End the current set. Called automatically when a prescribed set is met, and by the
@@ -224,11 +252,13 @@ final class WorkoutSession {
             duration: Date().timeIntervalSince(setStartedAt),
             averageDepth: detector?.averageDepth,
             averageTravel: (detector as? DepthRepDetector)?.averageTravel,
+            repTravels: measuredTravels(),
             engine: engine
         )
         completedSets.append(record)
         detector?.resetCount()
         reps = 0
+        hasHitTarget = false
         if preferences.hapticsEnabled { Haptics.setComplete() }
 
         if isLastSet || setIndex + 1 >= targets.count {
@@ -285,10 +315,21 @@ final class WorkoutSession {
                 duration: Date().timeIntervalSince(setStartedAt),
                 averageDepth: detector?.averageDepth,
                 averageTravel: (detector as? DepthRepDetector)?.averageTravel,
+                repTravels: measuredTravels(),
                 engine: engine
             ))
         }
         finish()
+    }
+
+    /// The current set's per-rep depths, or nil when this engine does not measure them.
+    ///
+    /// The nil matters: `CompletedSet.repTravels` distinguishes "not measured" from "no
+    /// depth", and storing `[]` for a tapped set would claim an empty distribution rather
+    /// than no distribution.
+    private func measuredTravels() -> [Double]? {
+        let travels = detector?.repTravels ?? []
+        return travels.isEmpty ? nil : travels
     }
 
     private func finish() {

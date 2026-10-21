@@ -121,6 +121,12 @@ struct TrainView: View {
                     }
                 }
             }
+        } else if store.planIsDailyNumber, store.repsToday < store.goalToday {
+            // A one-number-a-day plan has no scheduled session, so it reached none of the
+            // branches above and fell through to "Done for today" — at zero reps, with no
+            // way to start. The daily-goal plan has been unusable from this screen for
+            // that reason as well as for having a goal nobody could edit.
+            dailyGoalCard
         } else {
             RCard {
                 VStack(alignment: .leading, spacing: RTheme.Spacing.stack) {
@@ -132,6 +138,49 @@ struct TrainView: View {
                         Divider()
                         upcoming(next)
                     }
+                }
+            }
+        }
+    }
+
+    /// Today's number, for the fixed and climbing daily plans.
+    ///
+    /// Starts a session targeting what is *left* of the goal rather than the whole thing,
+    /// so twenty push-ups at lunch and thirty in the evening is two sessions that add up
+    /// rather than two that each demand the full number.
+    private var dailyGoalCard: some View {
+        let remaining = max(1, store.goalToday - store.repsToday)
+        let isPartway = store.repsToday > 0
+        return RCard {
+            VStack(alignment: .leading, spacing: RTheme.Spacing.stack) {
+                SectionHeader(
+                    icon: store.planIsClimbing ? "chart.line.uptrend.xyaxis" : "target",
+                    title: isPartway ? "Finish today" : "Today's goal"
+                )
+                HStack(alignment: .firstTextBaseline, spacing: RTheme.Spacing.tight) {
+                    Text("\(remaining)")
+                        .font(RTheme.hero)
+                        .monospacedDigit()
+                        .foregroundStyle(Color.rForeground)
+                    Text(isPartway
+                         ? "to go, of \(store.goalToday)"
+                         : "push-ups, split however you like")
+                        .font(RTheme.body)
+                        .foregroundStyle(Color.rMutedForeground)
+                }
+
+                // The climb's whole appeal is that tomorrow is visible from today, so it
+                // says so rather than making the user infer it from the Plan tab.
+                if store.planIsClimbing, let next = store.climbNextGoal {
+                    Text("Hit it and tomorrow is \(next).")
+                        .font(RTheme.captionMedium)
+                        .foregroundStyle(Color.rPrimary)
+                }
+
+                PrimaryButton(title: "START TRAINING", systemImage: "play.fill") {
+                    Haptics.tap()
+                    placementTargets = [remaining]
+                    showPlacement = true
                 }
             }
         }

@@ -37,7 +37,13 @@ struct SessionView: View {
                     onSkip: { session.endRest() }
                 )
             case .finished:
-                SummaryScreen(session: session, onDone: finishAndDismiss)
+                SummaryScreen(
+                    session: session,
+                    depth: DepthStats.summary(sessionTravels),
+                    bins: DepthStats.histogram(sessionTravels),
+                    comparison: depthComparison,
+                    onDone: finishAndDismiss
+                )
             }
         }
         .statusBarHidden(isWorking)
@@ -86,26 +92,49 @@ struct SessionView: View {
             Spacer()
 
             VStack(spacing: RTheme.Spacing.tight) {
-                Text(session.isFreeSet ? "DONE" : "TO GO")
+                Text(heroLabel)
                     .font(RTheme.font(size: 20, weight: .bold))
                     .kerning(1.5)
-                    .foregroundStyle(RTheme.onSessionDim)
+                    .foregroundStyle(session.hasHitTarget ? Color.rAccent : RTheme.onSessionDim)
+                    .animation(.snappy, value: session.hasHitTarget)
 
-                Text("\(session.remainingInSet)")
-                    .font(RTheme.counter)
-                    .monospacedDigit()
-                    .foregroundStyle(RTheme.onSession)
-                    .contentTransition(.numericText(countsDown: !session.isFreeSet))
-                    .animation(.snappy(duration: 0.2), value: session.remainingInSet)
-                    // The one visual cue that survives the screen blanking: at the top of
-                    // a rep the number is briefly larger, so the eye catches the beat.
-                    .scaleEffect(session.phase == .down ? 0.94 : 1)
-                    .animation(.spring(response: 0.2, dampingFraction: 0.7), value: session.phase)
+                ZStack {
+                    TargetBurst(isActive: session.hasHitTarget)
+
+                    Text("\(heroCount)")
+                        .font(RTheme.counter)
+                        .monospacedDigit()
+                        .foregroundStyle(session.hasHitTarget ? Color.rAccent : RTheme.onSession)
+                        .contentTransition(.numericText(countsDown: countsDown))
+                        .animation(.snappy(duration: 0.2), value: heroCount)
+                        // The one visual cue that survives the screen blanking: at the top
+                        // of a rep the number is briefly larger, so the eye catches the
+                        // beat.
+                        .scaleEffect(session.phase == .down ? 0.94 : 1)
+                        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: session.phase)
+                }
 
                 Text("PUSH-UPS")
                     .font(RTheme.font(size: 20, weight: .bold))
                     .kerning(1.5)
                     .foregroundStyle(RTheme.onSessionDim)
+
+                // Hitting the number is worth saying out loud on screen too, and the set
+                // deliberately does not end: deciding on rep 40 to make it 50 is the best
+                // thing a user can do here, and the app used to respond by closing the set
+                // under them.
+                if session.hasHitTarget {
+                    Text(session.repsBeyondTarget > 0
+                         ? "Target hit. \(session.repsBeyondTarget) past it."
+                         : "Target hit. Keep going, or finish below.")
+                        .font(RTheme.captionMedium)
+                        .foregroundStyle(RTheme.onSession)
+                        .padding(.horizontal, RTheme.Spacing.card)
+                        .padding(.vertical, RTheme.Spacing.inline)
+                        .background(.black.opacity(0.28), in: Capsule())
+                        .padding(.top, RTheme.Spacing.stack)
+                        .transition(.scale(scale: 0.7).combined(with: .opacity))
+                }
 
                 if session.isPaused {
                     Label("Paused — come back up to resume", systemImage: "pause.circle.fill")
@@ -114,6 +143,7 @@ struct SessionView: View {
                         .padding(.top, RTheme.Spacing.stack)
                 }
             }
+            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: session.hasHitTarget)
 
             Spacer()
 
@@ -125,6 +155,25 @@ struct SessionView: View {
         // means a user whose sensor is hooded can just start tapping without stopping.
         .contentShape(Rectangle())
         .onTapGesture { session.registerManualTap() }
+    }
+
+    /// Explicitly typed, all three of them, rather than inferred inside the view builder.
+    /// The working screen is already a deep expression and the type checker has given up
+    /// on it once before.
+    private var heroLabel: String {
+        if session.isFreeSet { return "DONE" }
+        return session.hasHitTarget ? "FINISHED" : "TO GO"
+    }
+
+    /// Past the target the hero number counts *up* what has been done rather than down to
+    /// zero. Zero is not a score, and the whole point of running on is watching it climb.
+    private var heroCount: Int {
+        if session.isFreeSet || session.hasHitTarget { return session.reps }
+        return session.remainingInSet
+    }
+
+    private var countsDown: Bool {
+        !session.isFreeSet && !session.hasHitTarget
     }
 
     private var statusPill: some View {
@@ -172,7 +221,9 @@ struct SessionView: View {
                     .background(.black.opacity(0.35), in: Circle())
             }
             .buttonStyle(.pressable)
-            .accessibilityLabel(session.isFreeSet ? "Finish set" : "Finish set early")
+            // Not "early" once the target is behind you: the set is running on by
+            // choice at that point, and VoiceOver should not call finishing it a shortfall.
+            .accessibilityLabel(session.isFreeSet || session.hasHitTarget ? "Finish set" : "Finish set early")
 
             circleButton("xmark", size: 52) {
                 Haptics.tap()
@@ -191,6 +242,30 @@ struct SessionView: View {
                 .background(.black.opacity(0.28), in: Circle())
         }
         .buttonStyle(.pressable)
+    }
+
+    // MARK: - Depth
+
+    /// Every measured rep in this session. Empty unless the depth engine ran, which is
+    /// what makes the whole depth block on the summary disappear rather than render zeros.
+    private var sessionTravels: [Double] {
+        session.completedSets.compactMap(\.repTravels).flatMap { $0 }
+    }
+
+    /// This session against the previous seven days.
+    ///
+    /// Today is excluded from the baseline: the session being summarised is not yet saved,
+    /// but an earlier session from the same day would be, and "deeper than the past week"
+    /// has to mean the week before rather than the morning.
+    private var depthComparison: DepthComparison? {
+        guard let weekAgo = DayKey.adding(-7, to: store.today) else { return nil }
+        return DepthStats.comparison(
+            session: sessionTravels,
+            against: store.state.workouts,
+            from: weekAgo,
+            through: store.today,
+            excluding: store.today
+        )
     }
 
     private func finishAndDismiss() {
@@ -232,6 +307,35 @@ private struct CountdownScreen: View {
                 .padding(.horizontal, RTheme.Spacing.page * 2)
                 .padding(.bottom, RTheme.Spacing.page * 3)
         }
+    }
+}
+
+// MARK: - Celebration
+
+/// A ring that expands out from behind the count once, when the target is reached.
+///
+/// Deliberately a single short burst rather than a loop. The set is still running and the
+/// user is still mid-effort: something permanently pulsing behind a 120pt number is noise
+/// at exactly the moment the number matters most. In proximity mode the screen is dark
+/// anyway, which is why the haptic and the spoken "target hit" carry this moment and the
+/// animation is the garnish rather than the signal.
+private struct TargetBurst: View {
+    let isActive: Bool
+
+    @State private var expanded = false
+
+    var body: some View {
+        Circle()
+            .stroke(Color.rAccent, lineWidth: 4)
+            .frame(width: 150, height: 150)
+            .scaleEffect(expanded ? 1.9 : 0.6)
+            .opacity(isActive && !expanded ? 0.85 : 0)
+            .allowsHitTesting(false)
+            .onChange(of: isActive) { _, hit in
+                guard hit else { expanded = false; return }
+                expanded = false
+                withAnimation(.easeOut(duration: 0.75)) { expanded = true }
+            }
     }
 }
 
@@ -284,12 +388,28 @@ private struct RestScreen: View {
 
 private struct SummaryScreen: View {
     let session: WorkoutSession
+    let depth: DepthSummary?
+    let bins: [DepthBin]
+    let comparison: DepthComparison?
     let onDone: () -> Void
 
     var body: some View {
-        VStack(spacing: RTheme.Spacing.card) {
-            Spacer()
+        // Scrollable, with the button pinned below it. The histogram pushed this screen
+        // past the height of a small iPhone, and the summary is the one screen every
+        // session ends on — a DONE button off the bottom edge would be unreachable.
+        // `basedOnSize` keeps it feeling fixed when it does fit, which is most of the time.
+        VStack(spacing: 0) {
+            ScrollView {
+                content.padding(.top, RTheme.Spacing.page * 3)
+            }
+            .scrollBounceBehavior(.basedOnSize)
 
+            doneButton
+        }
+    }
+
+    private var content: some View {
+        VStack(spacing: RTheme.Spacing.card) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 56))
                 .foregroundStyle(RTheme.onSession)
@@ -321,30 +441,54 @@ private struct SummaryScreen: View {
                 .padding(.top, RTheme.Spacing.inline)
             }
 
-            // Percent for comparability across sessions, centimetres because a person
-            // can picture 24 cm and cannot picture 82%.
-            if let depth = Format.depth(session.completedSets.compactMap(\.averageDepth).average) {
-                let travel = session.completedSets.compactMap(\.averageTravel).average
-                    .map { " (\(Int(($0 * 100).rounded())) cm)" } ?? ""
-                Label("Average depth \(depth)\(travel)", systemImage: "arrow.down.to.line")
-                    .font(RTheme.caption)
-                    .foregroundStyle(RTheme.onSessionDim)
-            }
+            // The depth block only exists when the depth engine ran. A tapped set has no
+            // distribution and must not be shown an empty one.
+            if let depth {
+                VStack(spacing: RTheme.Spacing.stack) {
+                    DepthVerdict(
+                        summary: depth,
+                        comparison: comparison,
+                        foreground: RTheme.onSession,
+                        dimmed: RTheme.onSessionDim
+                    )
 
-            Spacer()
+                    DepthHistogram(
+                        bins: bins,
+                        tint: RTheme.onSession,
+                        labelColor: RTheme.onSessionDim,
+                        height: 64
+                    )
 
-            Button(action: onDone) {
-                Text("DONE")
-                    .font(RTheme.font(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.rPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, RTheme.Spacing.card)
-                    .background(RTheme.onSession, in: Capsule())
+                    // The percentage stays, below the centimetres rather than instead of
+                    // them: it is the figure that compares across people and postures,
+                    // and cm is the one you can picture.
+                    if let fraction = Format.depth(session.completedSets.compactMap(\.averageDepth).average) {
+                        Text("\(fraction) of full extension · \(depth.reps) reps measured")
+                            .font(RTheme.font(size: 11))
+                            .foregroundStyle(RTheme.onSessionDim)
+                    }
+                }
+                .padding(.horizontal, RTheme.Spacing.page * 1.5)
+                .padding(.top, RTheme.Spacing.card)
             }
-            .buttonStyle(.pressable)
-            .padding(.horizontal, RTheme.Spacing.page * 2)
-            .padding(.bottom, RTheme.Spacing.page * 3)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, RTheme.Spacing.card)
+    }
+
+    private var doneButton: some View {
+        Button(action: onDone) {
+            Text("DONE")
+                .font(RTheme.font(size: 17, weight: .semibold))
+                .foregroundStyle(Color.rPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, RTheme.Spacing.card)
+                .background(RTheme.onSession, in: Capsule())
+        }
+        .buttonStyle(.pressable)
+        .padding(.horizontal, RTheme.Spacing.page * 2)
+        .padding(.top, RTheme.Spacing.stack)
+        .padding(.bottom, RTheme.Spacing.page * 3)
     }
 }
 

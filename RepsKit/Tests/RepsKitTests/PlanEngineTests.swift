@@ -411,8 +411,29 @@ struct PlanCatalogTests {
     @Test("The default plan is free; the published programs are not")
     func adaptiveAndDailyGoalAreFree() {
         // The daily loop has to be free or the subscription has no habit to attach to.
+        // That covers both one-number-a-day plans: a goal you set and a goal that climbs
+        // are the same loop with different arithmetic, and gating either would put a
+        // paywall in front of the habit the subscription depends on.
         let free = Set(PlanCatalog.all.filter { !$0.isPro }.map(\.id))
-        #expect(free == [PlanCatalog.adaptiveID, PlanCatalog.dailyGoalID])
+        #expect(free == [PlanCatalog.adaptiveID, PlanCatalog.dailyGoalID, PlanCatalog.climbID])
         #expect(PlanCatalog.all.filter { $0.isPro }.map(\.id).sorted() == ["hundred", "pyramid"])
+    }
+
+    @Test("Every plan in the catalog produces a session someone can do")
+    func everyPlanIsCoherent() {
+        // A plan added as a catalog row without a generator behind it shows an empty
+        // prescription rather than failing anywhere, so the catalog is walked rather
+        // than trusted.
+        for template in PlanCatalog.all {
+            let state = makeState(planID: template.id, max: 40)
+            let sets = PlanEngine.sets(for: state, sessionIndex: 0)
+            if template.kind.isDailyNumber {
+                #expect(sets.isEmpty, "\(template.id) should prescribe no sets")
+                #expect(PlanEngine.total(for: state, sessionIndex: 0) > 0, "\(template.id) needs a number")
+            } else {
+                #expect(!sets.isEmpty, "\(template.id) prescribed nothing")
+                #expect(sets.allSatisfy { $0 > 0 }, "\(template.id) prescribed a zero set")
+            }
+        }
     }
 }

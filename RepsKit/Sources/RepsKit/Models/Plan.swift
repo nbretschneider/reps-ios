@@ -15,6 +15,23 @@ public enum PlanKind: String, Codable, Hashable, Sendable {
     case pyramid
     /// No prescribed sets at all — one number to reach per day, split however you like.
     case dailyGoal
+    /// The same one-number-a-day shape as `dailyGoal`, except the number rises on its own:
+    /// every day you reach it, tomorrow's goal is `climbStep` higher, up to a ceiling you
+    /// set.
+    ///
+    /// Deliberately *not* a fraction of a measured max. The adaptive plan is 60% of a max
+    /// test stepping 5% every three sessions, which is defensible arithmetic and completely
+    /// illegible from the outside: it produces numbers like 36 and then 38 with no visible
+    /// reason. A goal that goes up by two when you hit it needs no explanation.
+    case climb
+
+    /// One number a day rather than a prescribed session.
+    ///
+    /// These plans have no set list, no session index and no block, and they ask for every
+    /// day, so they prescribe no rest. Every branch that used to test `== .dailyGoal` means
+    /// this, and reading it off the kind is what stops the next plan of this shape from
+    /// having to be remembered at five separate call sites.
+    public var isDailyNumber: Bool { self == .dailyGoal || self == .climb }
 }
 
 /// A plan the user can choose. Templates are data, not code: adding one is adding a row.
@@ -24,7 +41,7 @@ public struct PlanTemplate: Codable, Hashable, Sendable, Identifiable {
     /// One line, shown under the name in the picker.
     public var summary: String
     public var kind: PlanKind
-    /// Sessions in one block. For `.dailyGoal` this is unused.
+    /// Sessions in one block. Unused by the one-number-a-day plans.
     public var sessionsPerBlock: Int
     /// How many days a week the plan trains, used only to describe it in the picker.
     public var sessionsPerWeek: Int
@@ -69,11 +86,15 @@ public struct PlanState: Codable, Hashable, Sendable {
     public var trainingWeekdays: Set<Int>
     /// Day key the current block started on.
     public var startedOn: String
-    /// Only meaningful for `.dailyGoal`.
+    /// Only meaningful for `.dailyGoal`. For `.climb` this is where the climb starts.
     public var dailyGoal: Int
     /// Backing store for `setCount`. Optional, forever: a `state.json` written before this
     /// field existed still has to decode, and an undecodable file is a dead end.
     private var setCountValue: Int?
+    /// Backing store for `climbStep`. Optional forever, same reason as `setCountValue`.
+    private var climbStepValue: Int?
+    /// Backing store for `climbCeiling`. Optional forever, same reason.
+    private var climbCeilingValue: Int?
 
     public init(
         planID: String,
@@ -87,7 +108,9 @@ public struct PlanState: Codable, Hashable, Sendable {
         trainingWeekdays: Set<Int> = [1, 2, 3, 4, 5, 6, 7],
         startedOn: String,
         dailyGoal: Int = 100,
-        setCount: Int = PlanState.defaultSetCount
+        setCount: Int = PlanState.defaultSetCount,
+        climbStep: Int = PlanState.defaultClimbStep,
+        climbCeiling: Int = PlanState.defaultClimbCeiling
     ) {
         self.planID = planID
         self.baseMax = baseMax
@@ -98,6 +121,8 @@ public struct PlanState: Codable, Hashable, Sendable {
         self.startedOn = startedOn
         self.dailyGoal = dailyGoal
         self.setCountValue = Self.clampSetCount(setCount)
+        self.climbStepValue = Self.clampClimbStep(climbStep)
+        self.climbCeilingValue = Self.clampClimbCeiling(climbCeiling)
     }
 
     /// One set. This is the product decision, not a placeholder.
@@ -124,6 +149,41 @@ public struct PlanState: Codable, Hashable, Sendable {
 
     private static func clampSetCount(_ value: Int) -> Int {
         min(maxSetCount, max(1, value))
+    }
+
+    // MARK: - Climb
+
+    /// Two a day. One is below the noise floor of how much a person varies day to day, and
+    /// five compounds to an impossible number inside a month.
+    public static let defaultClimbStep = 2
+    /// Past five a day the goal outruns anybody's recovery within weeks.
+    public static let maxClimbStep = 5
+    /// The number everyone has heard of, and far enough away to be worth climbing to.
+    public static let defaultClimbCeiling = 100
+    /// A ceiling below this is not a plan, and above it the climb is theatre.
+    public static let minClimbCeiling = 5
+    public static let maxClimbCeiling = 1000
+
+    /// How much the goal rises after a day that reached it. Clamped both ways, like
+    /// `setCount`, so a hand-edited file still produces a plan someone can follow.
+    public var climbStep: Int {
+        get { Self.clampClimbStep(climbStepValue ?? Self.defaultClimbStep) }
+        set { climbStepValue = Self.clampClimbStep(newValue) }
+    }
+
+    /// Where the climb stops. It holds here rather than ending: a goal you have arrived at
+    /// and can hit every day is the win condition, not a plan that has run out.
+    public var climbCeiling: Int {
+        get { Self.clampClimbCeiling(climbCeilingValue ?? Self.defaultClimbCeiling) }
+        set { climbCeilingValue = Self.clampClimbCeiling(newValue) }
+    }
+
+    private static func clampClimbStep(_ value: Int) -> Int {
+        min(maxClimbStep, max(1, value))
+    }
+
+    private static func clampClimbCeiling(_ value: Int) -> Int {
+        min(maxClimbCeiling, max(minClimbCeiling, value))
     }
 }
 

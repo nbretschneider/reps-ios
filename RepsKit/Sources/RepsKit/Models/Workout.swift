@@ -34,6 +34,16 @@ public struct CompletedSet: Codable, Hashable, Sendable, Identifiable {
     /// a person can picture. Optional forever: sets recorded before it existed decode
     /// as nil, and nil must render as nothing, never as 0 cm.
     public var averageTravel: Double?
+    /// Descent for every individual rep, in metres, in the order they happened.
+    ///
+    /// The mean above is what the plan and the summary line need; this is what a
+    /// distribution needs. A mean of 26 cm hides the difference between a steady 26 and
+    /// ten good reps followed by ten shallow ones, and the second is the one worth seeing.
+    ///
+    /// Optional forever, and emphatically so: no set recorded before this field existed
+    /// has per-rep data, and there is no way to reconstruct it from the mean. Nil must
+    /// render as "not measured", never as an empty distribution.
+    public var repTravels: [Double]?
     public var engine: CountingEngine
 
     public init(
@@ -45,6 +55,7 @@ public struct CompletedSet: Codable, Hashable, Sendable, Identifiable {
         restAfter: TimeInterval = 0,
         averageDepth: Double? = nil,
         averageTravel: Double? = nil,
+        repTravels: [Double]? = nil,
         engine: CountingEngine
     ) {
         self.id = id
@@ -55,6 +66,7 @@ public struct CompletedSet: Codable, Hashable, Sendable, Identifiable {
         self.restAfter = restAfter
         self.averageDepth = averageDepth
         self.averageTravel = averageTravel
+        self.repTravels = repTravels
         self.engine = engine
     }
 
@@ -117,6 +129,25 @@ public struct Workout: Codable, Hashable, Sendable, Identifiable {
 
     public var averageDepth: Double? {
         let measured = sets.compactMap(\.averageDepth)
+        guard !measured.isEmpty else { return nil }
+        return measured.reduce(0, +) / Double(measured.count)
+    }
+
+    /// Every rep's descent across the whole session, in metres. Empty when nothing in the
+    /// session was measured, which is every session recorded before per-rep depth existed
+    /// and every session counted by tapping.
+    public var repTravels: [Double] {
+        sets.compactMap(\.repTravels).flatMap { $0 }
+    }
+
+    /// Mean descent per rep in metres, weighted by the reps actually measured rather than
+    /// by set. A 30-rep set and a 3-rep set are not equal evidence.
+    public var averageTravel: Double? {
+        let all = repTravels
+        if !all.isEmpty { return all.reduce(0, +) / Double(all.count) }
+        // Falls back to the per-set means for history that predates `repTravels`, so the
+        // trend line still works on sessions the histogram cannot draw.
+        let measured = sets.compactMap(\.averageTravel)
         guard !measured.isEmpty else { return nil }
         return measured.reduce(0, +) / Double(measured.count)
     }

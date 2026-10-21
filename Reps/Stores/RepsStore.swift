@@ -136,6 +136,58 @@ final class RepsStore {
 
     var setCount: Int { state.plan?.setCount ?? PlanState.defaultSetCount }
 
+    // MARK: - Daily goal
+
+    /// Is the current plan one number a day, fixed or climbing?
+    var planIsDailyNumber: Bool {
+        guard let plan = state.plan else { return false }
+        return PlanCatalog.isDailyNumber(plan.planID)
+    }
+
+    var planIsClimbing: Bool {
+        guard let plan = state.plan else { return false }
+        return PlanCatalog.templateOrDefault(plan.planID).kind == .climb
+    }
+
+    /// Set the number, for either daily plan.
+    ///
+    /// In climbing mode the stored number is where the climb *starts*, so setting it also
+    /// re-anchors the climb to today. Without that, typing 50 while the climb has already
+    /// walked from 40 up to 48 would re-derive those four steps on top of the new figure
+    /// and show 58 — the one number the user definitely did not ask for.
+    func setDailyGoal(_ goal: Int) {
+        guard var plan = state.plan else { return }
+        plan.dailyGoal = max(1, goal)
+        if planIsClimbing { plan.startedOn = today }
+        mutate(.setPlan(plan))
+    }
+
+    func setClimbStep(_ step: Int) {
+        guard var plan = state.plan else { return }
+        plan.climbStep = step
+        mutate(.setPlan(plan))
+    }
+
+    func setClimbCeiling(_ ceiling: Int) {
+        guard var plan = state.plan else { return }
+        plan.climbCeiling = ceiling
+        mutate(.setPlan(plan))
+    }
+
+    /// Flip between the fixed and climbing versions of the daily goal.
+    ///
+    /// Carries the number across and re-anchors `startedOn` to today, so switching to
+    /// climbing starts the climb from where you are now rather than replaying months of
+    /// history you did under a different plan and arriving at the ceiling on day one.
+    func setGoalClimbing(_ climbing: Bool) {
+        guard var plan = state.plan, planIsDailyNumber else { return }
+        let current = goalToday
+        plan.planID = climbing ? PlanCatalog.climbID : PlanCatalog.dailyGoalID
+        plan.dailyGoal = max(1, current)
+        plan.startedOn = today
+        mutate(.setPlan(plan))
+    }
+
     /// The engine default changed to depth after device testing showed the proximity
     /// path cannot count push-ups on iPhone 14 Pro and later. A preference saved under
     /// the old default pins the dead engine forever, because a persisted value always
@@ -227,11 +279,37 @@ final class RepsStore {
     }
 
     /// Today's target: the prescribed session if there is one, otherwise the daily goal.
+    ///
+    /// The single resolution point for a climb's goal. `PlanEngine.total` cannot compute
+    /// one, because it depends on the whole history rather than on the plan state alone.
     var goalToday: Int {
         guard let plan = state.plan else { return 0 }
         let template = PlanCatalog.templateOrDefault(plan.planID)
+        if template.kind == .climb { return climbGoal(on: today) }
         if template.kind == .dailyGoal { return plan.dailyGoal }
         return nextSession?.dayKey == today ? (nextSession?.total ?? 0) : 0
+    }
+
+    /// The climb's goal for any day, derived from history. Zero when the plan is not a
+    /// climb, so callers can ask without checking first.
+    func climbGoal(on dayKey: String) -> Int {
+        guard let plan = state.plan,
+              PlanCatalog.templateOrDefault(plan.planID).kind == .climb else { return 0 }
+        return PlanEngine.climbGoal(
+            for: plan,
+            on: dayKey,
+            repsByDay: Stats.repsByDay(state.workouts),
+            calendar: calendar
+        )
+    }
+
+    /// What the climb will ask for tomorrow if today's goal is reached, for the "next up"
+    /// line on the Plan tab. Nil when there is no climb or it has arrived at its ceiling.
+    var climbNextGoal: Int? {
+        guard let plan = state.plan,
+              PlanCatalog.templateOrDefault(plan.planID).kind == .climb else { return nil }
+        let next = min(plan.climbCeiling, goalToday + plan.climbStep)
+        return next > goalToday ? next : nil
     }
 
     var isRestDayToday: Bool {
@@ -282,18 +360,36 @@ final class RepsStore {
     func goal(on dayKey: String) -> Int {
         guard let plan = state.plan else { return 0 }
         let template = PlanCatalog.templateOrDefault(plan.planID)
+        if template.kind == .climb { return climbGoal(on: dayKey) }
         return template.kind == .dailyGoal ? plan.dailyGoal : 0
     }
 
     func series(from start: String, through end: String) -> [DayPoint] {
-        // The goal is resolved to a value *before* the call rather than passed as a closure
-        // over `self`. `Stats.series` is nonisolated, and handing it a closure that reaches
-        // back into main-actor state is exactly the capture Swift 6 refuses.
-        let dailyGoal = goal(on: start)
+        // Goals are resolved to plain values *before* the call rather than passed as a
+        // closure over `self`. `Stats.series` is nonisolated, and handing it a closure that
+        // reaches back into main-actor state is exactly the capture Swift 6 refuses.
+        //
+        // A map rather than one value, because a climb's goal is different on every day of
+        // the range. Resolving one goal for the whole month would have drawn every ring in
+        // the grid against whatever today's number happens to be.
+        let fallback = goal(on: start)
+        let goals = climbGoals(from: start, through: end)
         return Stats.series(
             state.workouts, from: start, through: end,
-            goal: { _ in dailyGoal },
+            goal: { goals[$0] ?? fallback },
             restDays: restDays(from: start, through: end), calendar: calendar
+        )
+    }
+
+    /// Per-day goals across a range for a climb, empty for every other plan. One walk, not
+    /// one per day: this is recomputed on every render and the year chart asks for 365 of
+    /// them at once.
+    private func climbGoals(from start: String, through end: String) -> [String: Int] {
+        guard let plan = state.plan,
+              PlanCatalog.templateOrDefault(plan.planID).kind == .climb else { return [:] }
+        return PlanEngine.climbGoals(
+            for: plan, from: start, through: end,
+            repsByDay: Stats.repsByDay(state.workouts), calendar: calendar
         )
     }
 

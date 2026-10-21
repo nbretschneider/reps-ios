@@ -18,8 +18,15 @@ struct PlanView: View {
                         if let plan = store.state.plan {
                             progressCard(plan)
                             if PlanEngine.needsMaxTest(plan) { retestCard }
-                            shapeCard
-                            scheduleCard
+                            // A one-number-a-day plan has no set prescription and no
+                            // schedule to show, so it gets the goal editor in place of
+                            // both rather than two cards explaining what it is not.
+                            if store.planIsDailyNumber {
+                                goalCard(plan)
+                            } else {
+                                shapeCard
+                                scheduleCard
+                            }
                             settingsCard(plan)
                         } else {
                             REmptyState(
@@ -45,12 +52,15 @@ struct PlanView: View {
     private func progressCard(_ plan: PlanState) -> some View {
         let template = PlanCatalog.templateOrDefault(plan.planID)
         let perBlock = max(1, template.sessionsPerBlock)
-        let fraction = template.kind == .dailyGoal ? 0 : Double(plan.sessionIndex) / Double(perBlock)
+        let fraction = template.kind.isDailyNumber ? 0 : Double(plan.sessionIndex) / Double(perBlock)
 
         return RCard {
             HStack(spacing: RTheme.Spacing.card) {
-                if template.kind == .dailyGoal {
-                    RRing(fraction: min(1, Double(store.repsToday) / Double(max(1, plan.dailyGoal))),
+                if template.kind.isDailyNumber {
+                    // Against today's goal, which for a climb is derived rather than
+                    // stored. Reading `plan.dailyGoal` here would draw the ring against
+                    // the number the climb started at months ago.
+                    RRing(fraction: min(1, Double(store.repsToday) / Double(max(1, store.goalToday))),
                           size: 96, label: "\(store.repsToday)")
                 } else {
                     ZStack {
@@ -77,7 +87,12 @@ struct PlanView: View {
                     Text(template.summary)
                         .font(RTheme.caption)
                         .foregroundStyle(Color.rMutedForeground)
-                    if template.kind != .dailyGoal {
+                    if template.kind.isDailyNumber {
+                        Text("Today: \(store.goalToday)")
+                            .font(RTheme.captionMedium)
+                            .foregroundStyle(Color.rPrimary)
+                            .padding(.top, RTheme.Spacing.tight)
+                    } else {
                         Text("Anchor: \(plan.baseMax) max")
                             .font(RTheme.captionMedium)
                             .foregroundStyle(Color.rPrimary)
@@ -85,6 +100,25 @@ struct PlanView: View {
                     }
                 }
                 Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private func goalCard(_ plan: PlanState) -> some View {
+        RCard {
+            VStack(alignment: .leading, spacing: RTheme.Spacing.stack) {
+                SectionHeader(icon: "target", title: "Daily goal")
+                DailyGoalControl(
+                    goal: store.planIsClimbing ? store.goalToday : plan.dailyGoal,
+                    isClimbing: store.planIsClimbing,
+                    step: plan.climbStep,
+                    ceiling: plan.climbCeiling,
+                    nextGoal: store.climbNextGoal,
+                    onGoalChange: { store.setDailyGoal($0) },
+                    onModeChange: { store.setGoalClimbing($0) },
+                    onStepChange: { store.setClimbStep($0) },
+                    onCeilingChange: { store.setClimbCeiling($0) }
+                )
             }
         }
     }
@@ -159,8 +193,12 @@ struct PlanView: View {
             VStack(spacing: 0) {
                 row("Training days", value: weekdaySummary(plan.trainingWeekdays)) { showDays = true }
                 Divider().padding(.leading, RTheme.Spacing.card)
-                row("Retest max", value: "\(plan.baseMax)") { showMaxTest = true }
-                Divider().padding(.leading, RTheme.Spacing.card)
+                // A daily number is not scaled off a max test, so offering to retest one
+                // is offering to change a number that nothing reads.
+                if !store.planIsDailyNumber {
+                    row("Retest max", value: "\(plan.baseMax)") { showMaxTest = true }
+                    Divider().padding(.leading, RTheme.Spacing.card)
+                }
                 row("Switch plan", value: PlanCatalog.templateOrDefault(plan.planID).name) { showPicker = true }
             }
         }

@@ -30,7 +30,17 @@ protocol RepDetector: AnyObject {
     var count: Int { get }
     /// Mean depth across the current set, or nil for engines that cannot measure it.
     var averageDepth: Double? { get }
+    /// Every rep's descent in metres, in order, for engines that measure it. Empty for the
+    /// ones that cannot — which is why it is an array rather than an optional here: at the
+    /// protocol level "this engine does not measure depth" and "no reps yet" are the same
+    /// answer, and `CompletedSet` is where the distinction becomes nil.
+    var repTravels: [Double] { get }
     var engine: CountingEngine { get }
+}
+
+extension RepDetector {
+    /// Engines that cannot measure depth do not have to say so.
+    var repTravels: [Double] { [] }
 }
 
 struct RepEvent {

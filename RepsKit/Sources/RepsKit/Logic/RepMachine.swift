@@ -275,6 +275,19 @@ public struct DepthRepMachine: Sendable {
         travels.isEmpty ? nil : travels.reduce(0, +) / Double(travels.count)
     }
 
+    /// Every rep's travel in metres, in order, for the session histogram.
+    ///
+    /// The machine has always kept these to compute the mean; it just threw them away
+    /// afterwards. A mean tells you the set was 26 cm, and this tells you whether that was
+    /// twenty honest reps or ten good ones and ten that stopped halfway.
+    ///
+    /// Note the ordering contract: `travels[i]` belongs to rep `i + 1` of the current set,
+    /// and `reset()` clears it along with the count.
+    public var repTravels: [Double] { travels }
+
+    /// Every rep's depth as a fraction of its local top, in order.
+    public var repDepths: [Double] { depths }
+
     private func allow(_ t: TimeInterval) -> Bool {
         guard let last = lastTransition else { return true }
         return t - last >= config.timing.minPhase

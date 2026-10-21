@@ -92,6 +92,10 @@ public enum DemoData {
                 // is what the deload rule is there for.
                 let completed = rolls.chance(80) ? target : max(1, target - rolls.inRange(1...5))
                 let started = at(date, hour: rolls.inRange(6...20), calendar: calendar)
+                // Depth gets deeper across the generated window, so the profile's depth
+                // trend has a direction in it rather than nine months of noise.
+                let depthFloor = 24 + Int((6.0 * progress).rounded())
+                let travels = repTravels(count: completed, centre: depthFloor, rolls: &rolls)
 
                 workouts.append(Workout(
                     dayKey: dayKey,
@@ -106,7 +110,8 @@ public enum DemoData {
                         // recorded entirely as proximity has no depth anywhere, so the
                         // screens that show a depth score screenshot empty.
                         averageDepth: Double(rolls.inRange(74...93)) / 100,
-                        averageTravel: Double(rolls.inRange(26...38)) / 100,
+                        averageTravel: mean(travels),
+                        repTravels: travels,
                         engine: .depth
                     )],
                     planID: PlanCatalog.adaptiveID,
@@ -126,11 +131,17 @@ public enum DemoData {
             if rolls.chance(14) {
                 let started = at(date, hour: rolls.inRange(9...21), calendar: calendar)
                 let reps = rolls.inRange(10...25)
+                // A set squeezed in at a desk is genuinely shallower than a session on the
+                // floor, and the histogram is more honest for saying so.
+                let travels = repTravels(count: reps, centre: 22, rolls: &rolls)
                 workouts.append(Workout(
                     dayKey: dayKey,
                     startedAt: started,
                     sets: [CompletedSet(target: 0, completed: reps, startedAt: started,
-                                        duration: Double(reps) * 2.4, engine: .depth)]
+                                        duration: Double(reps) * 2.4,
+                                        averageTravel: mean(travels),
+                                        repTravels: travels,
+                                        engine: .depth)]
                 ))
             }
         }
@@ -158,5 +169,29 @@ public enum DemoData {
 
     private static func at(_ day: Date, hour: Int, calendar: Calendar) -> Date {
         calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day) ?? day
+    }
+
+    /// One descent per rep, in metres, scattered around `centre` centimetres.
+    ///
+    /// The last few reps of a set are shallower than the first few, because that is what
+    /// fatigue does and a histogram of identical bars is a picture of synthetic data. The
+    /// drift is deliberately small: the point is a distribution with a shape, not a story.
+    private static func repTravels(count: Int, centre: Int, rolls: inout Rolls) -> [Double] {
+        guard count > 0 else { return [] }
+        // A plain loop rather than `map`: the generator is `inout`, and while a
+        // non-escaping closure may capture it, spelling it out keeps the next edit here
+        // from tripping over that rule.
+        var out: [Double] = []
+        out.reserveCapacity(count)
+        for index in 0..<count {
+            let fatigue = Double(index) / Double(max(1, count - 1)) * 3
+            let jitter = Double(rolls.inRange(0...4)) - 2
+            out.append(max(0.08, (Double(centre) - fatigue + jitter) / 100))
+        }
+        return out
+    }
+
+    private static func mean(_ values: [Double]) -> Double? {
+        values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
     }
 }

@@ -82,6 +82,72 @@ struct WorkoutSessionTests {
         #expect(workout?.isComplete == false)
         #expect(workout?.sets.first?.target == 30)
     }
+
+    @Test("Reaching the target does not end the last set")
+    func targetDoesNotEndTheSet() {
+        // The whole point: deciding on rep 40 to make it 50 is the best thing a user can
+        // do, and the app used to close the set under them at exactly that moment.
+        let session = WorkoutSession(targets: [40], preferences: preferences())
+        session.beginWorkingForTesting()
+        for rep in 1...40 { session.registerRepForTesting(rep) }
+
+        #expect(session.hasHitTarget)
+        #expect(session.stage == .working)
+        #expect(session.completedSets.isEmpty)
+    }
+
+    @Test("Reps past the target are counted and saved")
+    func overshootIsKept() {
+        let session = WorkoutSession(targets: [40], preferences: preferences())
+        session.beginWorkingForTesting()
+        for rep in 1...50 { session.registerRepForTesting(rep) }
+
+        #expect(session.repsBeyondTarget == 10)
+        session.finishSet()
+
+        let workout = session.result()
+        #expect(workout?.totalReps == 50)
+        #expect(workout?.sets.first?.target == 40)
+        // Overshooting is still a completed session, so the plan advances rather than
+        // treating 50-of-40 as a shortfall.
+        #expect(workout?.isComplete == true)
+    }
+
+    @Test("An intermediate set still ends itself, so rest can start")
+    func middleSetsStillAutoAdvance() {
+        // Something has to start the rest timer, and the alternative is reaching for the
+        // phone mid-session with your chest on the floor.
+        let session = WorkoutSession(targets: [10, 8], preferences: preferences(rest: 0))
+        session.beginWorkingForTesting()
+        for rep in 1...10 { session.registerRepForTesting(rep) }
+
+        #expect(session.completedSets.count == 1)
+        #expect(session.completedSets.first?.completed == 10)
+        #expect(session.setIndex == 1)
+    }
+
+    @Test("The target flag is per set, not per session")
+    func targetFlagResetsBetweenSets() {
+        // Set three of three must not inherit set one's celebration.
+        let session = WorkoutSession(targets: [5, 5], preferences: preferences(rest: 0))
+        session.beginWorkingForTesting()
+        for rep in 1...5 { session.registerRepForTesting(rep) }
+        #expect(session.setIndex == 1)
+        #expect(session.hasHitTarget == false)
+        #expect(session.repsBeyondTarget == 0)
+    }
+
+    @Test("A free set never reports a target as hit")
+    func freeSetHasNoTargetToHit() {
+        // There is no number to reach, so there is nothing to celebrate reaching, and the
+        // hero count already counts up rather than down.
+        let session = WorkoutSession(targets: [], preferences: preferences())
+        session.beginWorkingForTesting()
+        for rep in 1...12 { session.registerRepForTesting(rep) }
+        #expect(session.hasHitTarget == false)
+        #expect(session.repsBeyondTarget == 0)
+        #expect(session.reps == 12)
+    }
 }
 
 @MainActor

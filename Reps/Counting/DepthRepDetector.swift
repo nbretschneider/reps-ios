@@ -50,6 +50,10 @@ final class DepthRepDetector: NSObject, RepDetector, ARSessionDelegate {
     var averageDepth: Double? { machine.averageDepth }
     /// Mean descent per rep in metres, the tangible twin of the depth fraction.
     var averageTravel: Double? { machine.averageTravel }
+
+    /// Every rep's descent this set, for the summary histogram. Cleared with the count on
+    /// `resetCount`, so a set only ever reports its own reps.
+    var repTravels: [Double] { machine.repTravels }
     let engine: CountingEngine = .depth
 
     private let session = ARSession()

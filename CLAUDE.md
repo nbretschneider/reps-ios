@@ -170,6 +170,13 @@ New fields on `PersistedState` are **optional, forever**, read through a compute
 drops the app into `.loadFailed`, which is a dead end with no route back except deleting
 the app and all its data.
 
+`CompletedSet.repTravels` is the per-rep descent in metres, and its optionality is
+load-bearing in both directions: **nil means "not measured"** (a tapped set, or any set
+recorded before the field existed) and must render as nothing, never as an empty
+distribution or 0 cm. There is no backfill — the mean cannot be un-averaged — so the
+histogram is simply absent for history older than the field. `WorkoutSession` stores nil
+rather than `[]` for exactly this reason.
+
 ## Plans
 
 `PlanEngine` is pure static functions over `PlanState`. Nothing is materialized: the
@@ -191,6 +198,53 @@ schedule on the Plan tab is recomputed on every render, which is why it can neve
   that quietly rescales itself is not the program the user chose.
 - **Pyramid** climbs one rung per session.
 - **Daily goal** has no sets at all: one number a day, split however you like.
+- **Climb** is the same shape as daily goal, except the number rises: every day you reach
+  it, tomorrow is `climbStep` (default 2) higher, up to a `climbCeiling` you set. One short
+  day holds; **two short days in a row ease the goal off 15%**, the same deload the adaptive
+  plan uses. A day you did not train at all is **neither a hit nor a miss** — without that
+  rule a week away compounds three deloads and hands back a goal 40% below the one you left,
+  and it is the same judgement the streak already makes about rest days.
+
+`PlanKind.isDailyNumber` is what every branch that used to test `== .dailyGoal` means. Use
+it: those two plans have no set list, no session index and no block, and they ask for every
+day, so there were five separate call sites to remember otherwise.
+
+**The climb's goal is derived, never stored.** `PlanState` keeps only where it started, the
+step and the ceiling; `PlanEngine.climbGoal` walks the days since and returns today's
+number. This is not a style preference — progression that *mutates* has to fire exactly
+once a day, and the spool re-applies envelopes after a crash, so a plan that stepped on
+every `advance` would step twice for two sessions in one day and again on a replay.
+Deriving removes the whole class of bug, which is why `PlanEngine.advance` deliberately
+does nothing at all for a climb. `climbGoals` is the same walk done once for a whole range,
+because the month grid and year chart ask for every day and re-render constantly; a test
+pins the two against each other, since two derivations of one number that can disagree is
+worse than one slow one. Editing the number re-anchors `startedOn` to today, or typing 50
+while the climb has already walked 40→48 would re-apply those four steps and show 58.
+
+**The two daily modes are one control, not two plans in a list.** `DailyGoalControl` on the
+Plan tab toggles Fixed/Climbing and writes the matching `planID`. Which brings up what it
+replaced: `dailyGoal` was hardcoded to `100` in `PlanPickerSheet.select` and **no screen in
+the app could change it** — a `goalDraft` state variable sat on that sheet, declared and
+wired to nothing. The one plan built around "pick your number" shipped with the number
+fixed. A dead `@State` is worth a second look.
+
+A one-number-a-day plan also has no `nextSession`, so it fell through every branch of
+`TrainView.todayCard` to "Done for today" — at zero reps, with no start button. Both daily
+plans now have their own branch there, targeting what is *left* of the goal so twenty at
+lunch and thirty in the evening add up instead of each demanding the full number.
+
+### Finishing a set
+
+**Reaching the target does not end the set.** It fires a haptic, says "target hit, keep
+going", switches the hero number from counting down to counting up, and otherwise gets out
+of the way. Deciding on rep 40 to make it 50 is the best thing a user can do, and the app
+used to answer by closing the set under them. Overshooting still records the session as
+complete, because `hitTarget` is `completed >= target`, so the plan advances normally.
+
+The exception is an **intermediate** set in a multi-set session, which still ends itself:
+something has to start the rest timer and the alternative is reaching for the phone
+mid-session with your chest on the floor. Only the last set runs on. `hasHitTarget` is per
+set, not per session.
 
 Progression: finishing every prescribed rep advances one session and clears the failure
 count. Falling short repeats the session. **Two consecutive failures deload the anchor 15%
@@ -271,6 +325,17 @@ engine behind Pro anyway, and the doc lost. Now that depth is the engine that ac
 counts, that gate would have been a paywall in front of the product, so it is gone. What
 Pro sells on top of depth counting is the *history* of the depth scores, not the ability to
 measure them.
+
+That line is where the depth analytics sit. The **post-session histogram is free** — it is
+the session you just did, like the average depth beside it has always been. The **Depth card
+on the Profile tab is Pro**, because it is thirty days of history. Its locked state says so
+in as many words ("Counting your depth is free. Keeping its history is part of Pro."), since
+an upsell that implies the measuring is paid is a lie about the product. The card is hidden
+entirely when no set has ever been measured: a padlock over an empty chart advertises
+something the user cannot use.
+
+Both daily-goal modes are free, including the climb, for the same reason the adaptive plan
+is. The set-count control and the goal control are never gated.
 
 The adaptive plan is free on purpose. It is the daily loop, and a subscription in front of
 the daily loop gates the habit the subscription depends on. The set-count control is never

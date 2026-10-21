@@ -81,6 +81,16 @@ final class RepCoach {
         }
     }
 
+    /// The target was reached and the set is still running.
+    ///
+    /// Deliberately not "set complete": the set is not over, and saying it is would be the
+    /// spoken version of the bug this replaced, where hitting the number ended the set
+    /// under the user. Non-interrupting, so it never clips the rep count it follows.
+    func targetReached(_ target: Int) {
+        guard voice != .silent else { return }
+        say("\(target). target hit. keep going.", interrupting: false)
+    }
+
     func restEnding() {
         guard voice != .silent else { return }
         say("get ready", interrupting: true)
