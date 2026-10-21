@@ -292,17 +292,30 @@ The app has no account, no server and no network calls other than StoreKit.
 
 ## Screenshot slots
 
-Rendered by `python3 AppStore/marketing/build_frames.py`. Six frames, in this order:
+Rendered by `python3 AppStore/marketing/build_frames.py`. Nine frames, in this order.
+
+Order is the listing's order, and the first three matter most: search results show three
+before anyone swipes. So it counts, it does not stop you, and you pick the number.
 
 1. **The active set.** The full-bleed magenta gradient with a huge TO GO number. This is
    the one that has to earn the tap, and it is the only screen that looks like nothing else
    in the category.
-2. **Train tab.** Today's number, one set, START TRAINING.
-3. **Plan tab.** The block ring, the anchor, the one-set / multiple-sets switch, the
+2. **Target hit.** The count flipped to counting up, past the number. Reaching your target
+   does not end the set, which is the thing competitors get wrong.
+3. **The goal control.** Fixed or Climbing, and the number. The feature that answers
+   "where does this number even come from".
+4. **Train tab.** The seven-day chart, today's number, START TRAINING.
+5. **Depth.** The post-session distribution in centimetres. Free, because it is the session
+   you just did; the Profile tab's thirty-day version is the Pro one.
+6. **Plan tab.** The block ring, the anchor, the one-set / multiple-sets switch, the
    upcoming schedule.
-4. **Profile.** The month grid of rings.
-5. **Placement.** Phone on the floor, and the sentence about the screen going dark.
-6. **Records and streak.**
+7. **Profile.** The month grid of rings.
+8. **Placement.** Phone on the floor, and the sentence about the screen going dark.
+9. **Records and streak.**
 
 Sizes: 6.9" (1320x2868) and 6.5" (1284x2778). Both are required; everything else is
-derived by App Store Connect.
+derived by App Store Connect. Apple allows ten, so there is one slot spare.
+
+**Keep these in step with what shipped.** The frames are mockups, not captures, so nothing
+forces them to match the build — a frame can advertise a screen the installed app does not
+have, and nobody finds out until a reviewer does.
