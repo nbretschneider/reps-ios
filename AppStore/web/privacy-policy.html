@@ -54,6 +54,25 @@
      kept are your rep count and a depth score per rep, both on your device. iOS asks for
      camera permission the first time, and you can revoke it at any time in Settings.</p>
 
+  <h2>Face data (TrueDepth)</h2>
+  <p><strong>What is collected.</strong> While a set is running, Reps uses ARKit face
+     tracking on the front TrueDepth camera and reads one thing from it: the position of
+     your face relative to the phone, which gives a distance in centimetres. Reps does not
+     read or store face geometry, facial expressions, a face map, or any image or video.</p>
+  <p><strong>Why.</strong> Only to count push-ups and to score how far you lower on each
+     rep. It is not used for identification, authentication, advertising, analytics or
+     profiling.</p>
+  <p><strong>Storage and retention.</strong> The live distance is held in memory for a
+     fraction of a second and then discarded. What is kept is the resulting per-rep
+     descent in centimetres, saved on your device as part of your workout history. That
+     is a measurement of movement, not face data, and it cannot be used to recognise you.</p>
+  <p><strong>Sharing.</strong> None. Face data is never sent off your iPhone, to us or
+     to anyone else. Reps has no server, no analytics and no third party code, and makes
+     no network requests.</p>
+  <p><strong>Deletion.</strong> Because no face data is retained, there is nothing to
+     delete. Your depth history can be removed by erasing your data in Settings or by
+     deleting the app, and camera access can be revoked at any time in iOS Settings.</p>
+
   <h2>The proximity sensor and tap counting</h2>
   <p>You can switch counting to the proximity sensor near the earpiece, the same one that
      turns the screen off during a phone call. It reports only "something is near" or
